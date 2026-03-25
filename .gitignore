@@ -1,0 +1,193 @@
+# Build directories
+out/
+build/
+bin/
+lib/
+Build/
+Binaries/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+CMakeUserPresets.json
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.DotSettings.user
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# C++ objects and libs
+*.o
+*.lo
+*.slo
+*.ko
+*.obj
+*.elf
+*.ilk
+*.map
+*.exp
+*.gch
+*.pch
+*.lib
+*.a
+*.la
+*.lai
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.out
+*.app
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# C++ Intermediate files
+*.idb
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# CMake generated files
+**/CMakeFiles/
+**/cmake_install.cmake
+**/CTestTestfile.cmake
+**/Makefile
+*.cmake
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Package managers
+vcpkg_installed/
+packages/
+node_modules/
+
+# IDE specific
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Test results
+Testing/
+TestResults/
+
+# Documentation generated files
+docs/_build/
+docs/html/
+docs/latex/
+
+# Conan
+conan.lock
+conanbuildinfo.*
+conaninfo.txt
+graph_info.json
