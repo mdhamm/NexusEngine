@@ -1,13 +1,15 @@
 #pragma once
-#include <vector>
-#include <memory>
+#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <SDL.h>
 #include <flecs.h>
-#include "Scene.h"
-
+#include <vector>
+#include <memory>
 #if defined(_WIN32)
 #include <Windows.h>
 #endif // _WIN32
+
+#include "Scene.h"
+#include "common/GraphicsRenderer.h"
 
 #define REF(x) (void)(x)
 
@@ -16,25 +18,25 @@ namespace Diligent
     class IDeviceContext;
     class IRenderDevice;
     class ISwapChain;
+    class ImGuiImplDiligent;
 }
 
 namespace NexusEngine
 {
+    class Engine;
 
-    struct NativeWindow
+    class IGameApp
     {
-#if defined(_WIN32)
-        HWND hWnd = nullptr;
-#endif
-        int width = 0;
-        int height = 0;
-    };
+    public:
+        virtual ~IGameApp() = default;
 
-    struct GfxContext
-    {
-        Diligent::RefCntAutoPtr<Diligent::IRenderDevice>  device;
-        Diligent::RefCntAutoPtr<Diligent::IDeviceContext> ctx;
-        Diligent::RefCntAutoPtr<Diligent::ISwapChain>     swapchain;
+        /// <summary>
+        /// Called once at the start of the game. Use this to set up scenes, entities, etc.
+        /// </summary>
+        /// <param name="engine">Reference to the engine, for scene management and other operations</param>
+        /// <returns>True if initialization succeeded and the game can start; false to abort.</returns>
+        virtual void OnStartup(Engine& engine) {};
+        virtual void OnShutdown(Engine& engine) {};
     };
 
     class Engine
@@ -65,47 +67,30 @@ namespace NexusEngine
         void SetActiveScene(const std::string& name);
 
         // ImGui system
-        bool EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport);
-        void DisableImGui();
+       /* bool EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport);
+        void DisableImGui();*/
         void ProcessSDLEvent(const SDL_Event& e);
 
     private:
         void Tick(float dt);
-        void BeginUiFrame(float dt);
-        void RenderUi(Diligent::IDeviceContext* ctx);
+        //void BeginUiFrame(float dt);
+        //void RenderUi(Diligent::IDeviceContext* ctx);
 
     private:
         bool m_initialized = false;
         bool m_shutdown = false;
         IGameApp* m_game = nullptr;
-        GfxContext gfx_;
-        std::vector<std::unique_ptr<Scene>> scenes_;
+        GraphicsRenderer m_graphicsRenderer;
+        std::vector<std::unique_ptr<Scene>> m_scenes;
         Scene* m_activeScene = nullptr;
 
         struct UiState
         {
             bool enabled = false;
             SDL_Window* sdlWindow = nullptr;
-            class Diligent::ImGuiImplDiligent* imguiDiligent = nullptr;
-        } ui_;
+            Diligent::ImGuiImplDiligent* imguiDiligent = nullptr;
+        } m_ui;
     };
 
-    class IGameApp
-    {
-    public:
-        virtual ~IGameApp() = default;
-
-        /// <summary>
-        /// Called once at the start of the game. Use this to set up scenes, entities, etc.
-        /// </summary>
-        /// <param name="engine">Reference to the engine, for scene management and other operations</param>
-        /// <returns>True if initialization succeeded and the game can start; false to abort.</returns>
-        virtual void OnStartup(Engine& engine) {};
-        virtual void OnShutdown(Engine& engine) {};
-    };
-
-    bool CreateDeviceAndSwapchain(const NativeWindow& win, GfxContext& out);
-    void BeginFrame(GfxContext& gfx, float r, float g, float b, float a);
-    void EndFrame(GfxContext& gfx);
 
 } // namespace NexusEngine

@@ -5,13 +5,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(NexusEngine STATIC
   src/NexusEngine.cpp
-  src/common/DeviceInit.cpp
+  "src/common/GraphicsRenderer.cpp"
   src/Scene.cpp
   src/NexusEngine.h
-  src/common/DeviceInit.h
+  "src/common/GraphicsRenderer.h"
   src/Scene.h
-  src/components/CanvasComponent.h
-  src/components/CameraComponent.h)
+  
+  src/components/CameraComponent.h "src/components/MeshComponent.h" "src/components/RenderTextureComponent.h")
 
 target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src

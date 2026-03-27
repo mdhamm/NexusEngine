@@ -1,16 +1,20 @@
 #pragma once
-#include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
-#include <flecs.h>
+
+#include "RenderTextureComponent.h"
 
 namespace NexusEngine
 {
     struct CameraComponent
     {
-        Diligent::ITextureView* targetRTV = nullptr;
-        Diligent::ITextureView* targetDSV = nullptr;
-        Diligent::IDeviceContext* deviceCtx = nullptr;
+        enum class Target
+        {
+            SwapChain,
+            RenderTexture
+        };
 
-        flecs::entity canvas; // optional overlay UI canvas
-        int priority = 0;     // higher = rendered later (on top)
+        Target m_target = Target::SwapChain;
+        RenderTextureComponent* m_renderTexture = nullptr;
+
+        int m_priority = 0;     // higher = rendered later (on top)
     };
 } // namespace NexusEngine

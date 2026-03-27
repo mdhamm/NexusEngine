@@ -94,9 +94,9 @@ int main(int argc, char** argv)
         };
 
     NexusEngine::NativeWindow nativeWindow;
-    nativeWindow.width = winW;
-    nativeWindow.height = winH;
-    nativeWindow.hWnd = hWnd;
+    nativeWindow.m_width = winW;
+    nativeWindow.m_height = winH;
+    nativeWindow.m_hWnd = hWnd;
 
     NexusEngine::Engine engine;
     engine.Initialize(nativeWindow, std::move(game));

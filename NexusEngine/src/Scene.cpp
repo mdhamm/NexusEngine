@@ -1,49 +1,93 @@
 #include "Scene.h"
-#include <DiligentCore/Common/interface/BasicMath.hpp>
-#include "CameraComponent.h"
-#include "CanvasComponent.h"
-#include "components/RenderProxy.h"
+#include "components/CameraComponent.h"
+#include "components/MeshComponent.h"
 
 using namespace Diligent;
 namespace NexusEngine
 {
-    void RegisterSceneComponents(flecs::world& w)
+    Scene::Scene(GraphicsRenderer& graphicsRenderer, const std::string& name)
+        : m_name(name)
+        , m_graphicsRenderer(graphicsRenderer)
     {
-        w.component<CameraComponent>();
-        w.component<CanvasComponent>();
-        w.component<RenderProxy>();
+        RegisterSceneComponents();
     }
 
-    void Scene::update(float dt)
+    void Scene::Update(float dt)
     {
-        world.progress(dt);
+        m_world.progress(dt);
     }
 
-    void RenderScene(Scene& scene)
+    void Scene::Render()
     {
+        auto& ctx = m_graphicsRenderer.m_gfx.m_ctx;
+        if (!ctx)
+            return;
+
         // Iterate all cameras with an attached render target
-        scene.world.each<CameraComponent>(
+        m_world.each<CameraComponent>(
             [&](flecs::entity e, CameraComponent& cam)
             {
-                if (!cam.targetRTV || !cam.targetDSV)
-                    return;
-
-                auto* ctx = cam.deviceCtx;
-                ITextureView* rtvs[] = { cam.targetRTV.RawPtr<>() };
-                ctx->SetRenderTargets(1, rtvs, cam.targetDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-                const float clear[4] = { 0.05f, 0.05f, 0.08f, 1.0f };
-                ctx->ClearRenderTarget(rtvs[0], clear, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-                ctx->ClearDepthStencil(cam.targetDSV, CLEAR_DEPTH_FLAG, 1.0f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-
-                // TODO: draw renderables, meshes, etc.
-
-                // Draw UI overlay (Canvas)
-                if (cam.canvas.is_alive())
+                if (cam.m_target == CameraComponent::Target::SwapChain)
                 {
-                    auto canvasComp = cam.canvas.get<CanvasComponent>();
-                    if (canvasComp && canvasComp->uiLayerFn)
-                        canvasComp->uiLayerFn();
+                    // Draw all visible meshes for this camera
+                    m_world.each<MeshComponent>(
+                        [&](flecs::entity meshEntity, MeshComponent& mesh)
+                        {
+                            if (!mesh.visible || !mesh.pipelineState)
+                                return;
+
+                            // Set pipeline state
+                            ctx->SetPipelineState(mesh.pipelineState);
+
+                            // Bind shader resources if available
+                            if (mesh.shaderResourceBinding)
+                            {
+                                ctx->CommitShaderResources(mesh.shaderResourceBinding, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+                            }
+
+                            // Set vertex buffer
+                            if (mesh.vertexBuffer)
+                            {
+                                IBuffer* vertexBuffers[] = { mesh.vertexBuffer };
+                                Uint64 offsets[] = { 0 };
+                                ctx->SetVertexBuffers(0, 1, vertexBuffers, offsets, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+                            }
+
+                            // Draw
+                            if (mesh.indexBuffer && mesh.indexCount > 0)
+                            {
+                                // Indexed draw
+                                ctx->SetIndexBuffer(mesh.indexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+                                DrawIndexedAttribs drawAttrs;
+                                drawAttrs.IndexType = VT_UINT32; // Assuming 32-bit indices
+                                drawAttrs.NumIndices = mesh.indexCount;
+                                drawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
+
+                                ctx->DrawIndexed(drawAttrs);
+                            }
+                            else if (mesh.vertexCount > 0)
+                            {
+                                // Non-indexed draw
+                                DrawAttribs drawAttrs;
+                                drawAttrs.NumVertices = mesh.vertexCount;
+                                drawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
+
+                                ctx->Draw(drawAttrs);
+                            }
+                        });
+                }
+                else if (cam.m_target == CameraComponent::Target::RenderTexture)
+                {
+                    // TODO: Render to texture target
                 }
             });
+    }
+
+    void Scene::RegisterSceneComponents()
+    {
+        m_world.component<CameraComponent>();
+        m_world.component<MeshComponent>();
+        m_world.component<RenderTextureComponent>();
     }
 } // namespace NexusEngine

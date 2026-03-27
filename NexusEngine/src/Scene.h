@@ -4,36 +4,36 @@
 #include <vector>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
 
+#include "common/GraphicsRenderer.h"
+
 namespace NexusEngine
 {
     struct CameraComponent;
-    struct CanvasComponent;
 
     // A lightweight scene wrapper around a Flecs world.
     struct Scene
     {
-        std::string m_name;
-        flecs::world m_world;
+        Scene(GraphicsRenderer& graphicsRenderer, const std::string& name = "Unnamed");
 
-        Scene(const std::string& name = "Unnamed")
-            : m_name(name) {}
+        void Update(float dt);
+        void Render();
 
-        void update(float dt);
-
-        inline flecs::entity createEntity(const char* name = nullptr)
+        inline flecs::entity CreateEntity(const char* name = nullptr)
         {
             return m_world.entity(name);
         }
 
-        inline void destroyEntity(flecs::entity e)
+        inline void DestroyEntity(flecs::entity e)
         {
             if (e.is_alive()) e.destruct();
         }
+
+        std::string m_name;
+        flecs::world m_world;
+    private:
+        void RegisterSceneComponents();
+        
+        GraphicsRenderer m_graphicsRenderer;
     };
 
-    // Scene-global registration
-    void RegisterSceneComponents(flecs::world& w);
-
-    // Render entry point
-    void RenderScene(Scene& scene);
 } // namespace NexusEngine
