@@ -1,4 +1,9 @@
 #include "Game.h"
+#include <Scene.h>
+#include <components/CameraComponent.h>
+#include <components/TransformComponent.h>
+#include <components/RenderMeshComponent.h>
+#include <rendering/RenderResourceFactory.h>
 #include <flecs.h>
 #include <cmath>
 
@@ -8,21 +13,64 @@ namespace SampleGame
     struct LocalTransform { float x = 0, y = 0, z = 0; };
     struct WorldTransform { float x = 0, y = 0, z = 0; };
     struct Velocity { float x = 0, y = 0, z = 0; };
+    struct RotationSpeed { float x = 0, y = 0, z = 0; };
 
     class Game final : public NexusEngine::IGameApp
     {
     public:
         void OnStartup(NexusEngine::Engine& engine) override
         {
-            auto& w = engine.CreateScene("MainScene").m_world;
-            engine.SetActiveScene("MainScene"); // TODO: create version of SetActiveScene that takes a reference instead of looking up by name
+            auto* scene = &engine.CreateScene("MainScene");
+            engine.SetActiveScene("MainScene");
+            auto& w = scene->m_world;
 
-            // Register components (for readable dashboards/inspector)
+            // Register components
             w.component<LocalTransform>().member<float>("x").member<float>("y").member<float>("z");
             w.component<WorldTransform>().member<float>("x").member<float>("y").member<float>("z");
             w.component<Velocity>().member<float>("x").member<float>("y").member<float>("z");
+            w.component<RotationSpeed>().member<float>("x").member<float>("y").member<float>("z");
 
-            // TODO: the engine should be doing this
+            // Create a default camera
+            auto camera = w.entity("MainCamera")
+                .set(NexusEngine::CameraComponent{});
+
+            // Create rendering resources using the factory
+            auto* factory = scene->GetResourceFactory();
+            if (factory)
+            {
+                // Create shared resources
+                // TODO: we are leaking these. Also why are we creating a material in the game??
+                NexusEngine::Mesh* cubeMesh = factory->CreateCubeMesh();
+                NexusEngine::Material* unlitMaterial = factory->CreateUnlitMaterial();
+
+                if (cubeMesh && unlitMaterial)
+                {
+                    // Create rotating cube entity
+                    auto cube = w.entity("RotatingCube")
+                        .set(NexusEngine::TransformComponent{})
+                        .set(RotationSpeed{ 0.0f, 1.0f, 0.5f }); // Rotate around Y and Z axes
+
+                    auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();
+                    renderMesh->mesh = cubeMesh;
+                    renderMesh->material = unlitMaterial;
+                    renderMesh->visible = true;
+                }
+            }
+
+            // System to rotate objects with RotationSpeed component
+            w.system<NexusEngine::TransformComponent, RotationSpeed>("RotateObjects")
+                .kind(flecs::OnUpdate)
+                .iter(
+                    [](flecs::iter& it, NexusEngine::TransformComponent* transforms, RotationSpeed* speeds)
+                    {
+                        const float dt = static_cast<float>(it.delta_time());
+                        for (auto i : it)
+                        {
+                            transforms[i].rotation.x += speeds[i].x * dt;
+                            transforms[i].rotation.y += speeds[i].y * dt;
+                            transforms[i].rotation.z += speeds[i].z * dt;
+                        }
+                    });
 
             // 1) Hierarchy propagate: every frame
             w.system<LocalTransform, WorldTransform>("PropagateTransforms")
@@ -58,23 +106,21 @@ namespace SampleGame
             // 3) AI: run every 0.1 seconds (NOT every frame)
             w.system<>("AI_Tick")
                 .kind(flecs::OnUpdate)
-                .interval(0.1f)          // <-- runs ~10 Hz
+                .interval(0.1f)
                 .iter(
-                    [](flecs::iter& it) // payload optional; using .run keeps a no-component system
+                    [](flecs::iter& it)
                     {
                         (void)it;
-                        // Query AI, pathfind, etc.
                     });
 
             // 4) Expensive culling: run once every 4 frames
             w.system<>("VisibilityCulling")
                 .kind(flecs::PostUpdate)
-                .rate(4)                 // <-- runs at 1/4 frame rate
+                .rate(4)
                 .iter(
                     [](flecs::iter& it)
                     {
                         (void)it;
-                        // Broadphase/visibility here
                     });
 
             // Create a small hierarchy to see propagation working

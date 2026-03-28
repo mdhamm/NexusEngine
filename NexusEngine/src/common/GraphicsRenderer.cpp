@@ -35,6 +35,7 @@ namespace NexusEngine
         scDesc.Width = static_cast<Uint32>(win.m_width);
         scDesc.Height = static_cast<Uint32>(win.m_height);
         scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM_SRGB;
+        scDesc.DepthBufferFormat = TEX_FORMAT_D32_FLOAT;
 
         Win32NativeWindow wnd{};
         wnd.hWnd = static_cast<HWND>(win.m_hWnd);

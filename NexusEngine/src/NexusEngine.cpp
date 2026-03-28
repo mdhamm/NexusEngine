@@ -24,7 +24,8 @@ namespace NexusEngine
         }
         m_game = game.release();
         bool graphicsInitialized = m_graphicsRenderer.CreateDeviceAndSwapchain(win);
-        m_initialized = true;
+        m_initialized = graphicsInitialized;
+        return graphicsInitialized;
     }
 
     void Engine::Start()
