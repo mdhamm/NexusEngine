@@ -10,6 +10,8 @@
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 
+#include <functional>
+
 using namespace Diligent;
 namespace NexusEngine
 {
@@ -36,6 +38,61 @@ namespace NexusEngine
     void Scene::Update(float dt)
     {
         m_world.progress(dt);
+
+        auto composeWorldTransform = [](TransformComponent& transform, const TransformComponent* parentTransform)
+        {
+            if (parentTransform)
+            {
+                transform.m_worldPosition = parentTransform->m_worldPosition + transform.m_localPosition;
+                transform.m_worldRotation = parentTransform->m_worldRotation + transform.m_localRotation;
+                transform.m_worldScale = Diligent::float3(
+                    parentTransform->m_worldScale.x * transform.m_localScale.x,
+                    parentTransform->m_worldScale.y * transform.m_localScale.y,
+                    parentTransform->m_worldScale.z * transform.m_localScale.z);
+                transform.m_worldMatrix = transform.GetLocalMatrix() * parentTransform->GetWorldMatrix();
+            }
+            else
+            {
+                transform.m_worldPosition = transform.m_localPosition;
+                transform.m_worldRotation = transform.m_localRotation;
+                transform.m_worldScale = transform.m_localScale;
+                transform.m_worldMatrix = transform.GetLocalMatrix();
+            }
+        };
+
+        std::function<void(flecs::entity, const TransformComponent*)> propagateHierarchy;
+        propagateHierarchy = [&](flecs::entity entity, const TransformComponent* parentTransform)
+        {
+            const TransformComponent* currentTransform = parentTransform;
+
+            if (auto* transform = entity.get_mut<TransformComponent>())
+            {
+                composeWorldTransform(*transform, parentTransform);
+                currentTransform = transform;
+            }
+
+            entity.children(
+                [&](flecs::entity child)
+                {
+                    propagateHierarchy(child, currentTransform);
+                });
+        };
+
+        m_world.each<TransformComponent>(
+            [&](flecs::entity entity, TransformComponent&)
+            {
+                if (auto parent = entity.parent(); parent)
+                {
+                    if (!parent.has<TransformComponent>())
+                    {
+                        propagateHierarchy(entity, nullptr);
+                    }
+                }
+                else
+                {
+                    propagateHierarchy(entity, nullptr);
+                }
+            });
     }
 
     void Scene::Render()

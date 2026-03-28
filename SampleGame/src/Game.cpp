@@ -10,10 +10,10 @@
 namespace SampleGame
 {
     // ---------- Components ----------
-    struct LocalTransform { float x = 0, y = 0, z = 0; };
-    struct WorldTransform { float x = 0, y = 0, z = 0; };
-    struct Velocity { float x = 0, y = 0, z = 0; };
-    struct RotationSpeed { float x = 0, y = 0, z = 0; };
+    struct LocalTransform { float m_x = 0, m_y = 0, m_z = 0; };
+    struct WorldTransform { float m_x = 0, m_y = 0, m_z = 0; };
+    struct Velocity { float m_x = 0, m_y = 0, m_z = 0; };
+    struct RotationSpeed { float m_x = 0, m_y = 0, m_z = 0; };
 
     class Game final : public NexusEngine::IGameApp
     {
@@ -45,10 +45,24 @@ namespace SampleGame
 
                 if (cubeMesh && unlitMaterial)
                 {
-                    // Create rotating cube entity
-                    auto cube = w.entity("RotatingCube")
+                    auto parentCube = w.entity("ParentCube")
                         .set(NexusEngine::TransformComponent{})
-                        .set(RotationSpeed{ 0.0f, 1.0f, 0.5f }); // Rotate around Y and Z axes
+                        .set(RotationSpeed{ 0.35f, 0.7f, 0.0f });
+
+                    auto* parentRenderMesh = parentCube.get_mut<NexusEngine::RenderMeshComponent>();
+                    parentRenderMesh->mesh = cubeMesh;
+                    parentRenderMesh->material = unlitMaterial;
+                    parentRenderMesh->visible = true;
+
+                    // Create rotating cube entity as a child of the parent cube
+                    auto cube = w.entity("RotatingCube")
+                        .child_of(parentCube)
+                        .set(NexusEngine::TransformComponent{
+                            .m_localPosition = Diligent::float3(1.0f, 0.0f, 0.0f),
+                            .m_localRotation = Diligent::float3(0.0f, 0.0f, 0.0f),
+                            .m_localScale = Diligent::float3(0.3f, 0.3f, 0.3f)
+                        })
+                        .set(RotationSpeed{ 0.0f, 1.0f, 0.5f });
 
                     auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();
                     renderMesh->mesh = cubeMesh;
@@ -66,9 +80,9 @@ namespace SampleGame
                         const float dt = static_cast<float>(it.delta_time());
                         for (auto i : it)
                         {
-                            transforms[i].rotation.x += speeds[i].x * dt;
-                            transforms[i].rotation.y += speeds[i].y * dt;
-                            transforms[i].rotation.z += speeds[i].z * dt;
+                            transforms[i].m_localRotation.x += speeds[i].m_x * dt;
+                            transforms[i].m_localRotation.y += speeds[i].m_y * dt;
+                            transforms[i].m_localRotation.z += speeds[i].m_z * dt;
                         }
                     });
 
@@ -81,11 +95,11 @@ namespace SampleGame
                         if (auto p = e.parent(); p) {
                             if (const WorldTransform* pw = p.get<WorldTransform>())
                             {
-                                world = { pw->x + local.x, pw->y + local.y, pw->z + local.z };
+                                world = { pw->m_x + local.m_x, pw->m_y + local.m_y, pw->m_z + local.m_z };
                                 return;
                             }
                         }
-                        world = { local.x, local.y, local.z };
+                        world = { local.m_x, local.m_y, local.m_z };
                     });
 
             // 2) Movement: every frame, uses dt from iterator
@@ -97,9 +111,9 @@ namespace SampleGame
                         const float dt = static_cast<float>(it.delta_time());
                         for (auto i : it)
                         {
-                            lt[i].x += v[i].x * dt;
-                            lt[i].y += v[i].y * dt;
-                            lt[i].z += v[i].z * dt;
+                            lt[i].m_x += v[i].m_x * dt;
+                            lt[i].m_y += v[i].m_y * dt;
+                            lt[i].m_z += v[i].m_z * dt;
                         }
                     });
 
