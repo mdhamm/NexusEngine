@@ -8,6 +8,7 @@
 #include <DiligentCore/Graphics/GraphicsEngine/interface/PipelineState.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace NexusEngine
@@ -34,6 +35,12 @@ namespace NexusEngine
     class RenderResourceFactory
     {
     public:
+        struct CachedPipeline
+        {
+            Diligent::RefCntAutoPtr<Diligent::IPipelineState> m_pipelineState;
+            Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> m_shaderResourceBindingTemplate;
+        };
+
         RenderResourceFactory(Diligent::IRenderDevice* device, Diligent::IDeviceContext* context);
 
         // Shader creation
@@ -70,8 +77,22 @@ namespace NexusEngine
             const std::vector<Diligent::LayoutElement>& inputLayout,
             Diligent::PRIMITIVE_TOPOLOGY topology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
+        Material* CreateMaterialFromFiles(
+            const char* name,
+            const char* vsFilePath,
+            const char* psFilePath,
+            const std::vector<Diligent::LayoutElement>& inputLayout,
+            Diligent::PRIMITIVE_TOPOLOGY topology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
         Material* CreateDefaultMaterial();
         Material* CreateUnlitMaterial();
+        bool CompileAllShaders();
+
+        CachedPipeline* GetOrCreatePipeline(
+            Material* material,
+            Mesh* mesh,
+            Diligent::TEXTURE_FORMAT rtvFormat,
+            Diligent::TEXTURE_FORMAT dsvFormat);
 
         // Mesh creation helpers
         Mesh* CreateMesh(
@@ -94,7 +115,23 @@ namespace NexusEngine
             Diligent::Uint32 size);
 
     private:
+        struct PipelineKey
+        {
+            const Material* m_material = nullptr;
+            const Mesh* m_mesh = nullptr;
+            Diligent::TEXTURE_FORMAT m_rtvFormat = Diligent::TEX_FORMAT_UNKNOWN;
+            Diligent::TEXTURE_FORMAT m_dsvFormat = Diligent::TEX_FORMAT_UNKNOWN;
+
+            bool operator==(const PipelineKey& other) const = default;
+        };
+
+        struct PipelineKeyHasher
+        {
+            size_t operator()(const PipelineKey& key) const noexcept;
+        };
+
         Diligent::IRenderDevice* m_device;
         Diligent::IDeviceContext* m_context;
+        std::unordered_map<PipelineKey, CachedPipeline, PipelineKeyHasher> m_pipelineCache;
     };
 } // namespace NexusEngine

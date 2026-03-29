@@ -12,6 +12,17 @@ namespace NexusEngine
     struct CameraComponent;
     class RenderResourceFactory;
 
+    // Engine pipeline phases
+    struct InputPhase {};
+    struct GameplayPhase {};
+    struct PhysicsPhase {};
+    struct TransformPhase {};
+    struct AnimationPhase {};
+    struct VisibilityPhase {};
+    struct RenderPrepPhase {};
+    struct RenderPhase {};
+    struct RenderPostPhase {};
+
     // A lightweight scene wrapper around a Flecs world.
     struct Scene
     {
@@ -19,7 +30,6 @@ namespace NexusEngine
         ~Scene();
 
         void Update(float dt);
-        void Render();
 
         inline flecs::entity CreateEntity(const char* name = nullptr)
         {
@@ -38,9 +48,12 @@ namespace NexusEngine
         flecs::world m_world;
     private:
         void RegisterSceneComponents();
+        void RegisterPhases();
+        void RegisterSystems();
 
         GraphicsRenderer m_graphicsRenderer;
         std::unique_ptr<RenderResourceFactory> m_resourceFactory;
+        float m_clearAnimationTime = 0.0f;
     };
 
 } // namespace NexusEngine

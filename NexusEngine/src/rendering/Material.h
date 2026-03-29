@@ -30,6 +30,9 @@ namespace NexusEngine
         
         // Uniform buffers
         Diligent::RefCntAutoPtr<Diligent::IBuffer> materialConstantBuffer;
+
+        // Pipeline inputs used to build cached pipeline variants on demand
+        std::vector<Diligent::LayoutElement> m_inputLayout;
         
         // Material properties
         std::string name;

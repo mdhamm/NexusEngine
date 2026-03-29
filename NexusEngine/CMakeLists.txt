@@ -18,6 +18,12 @@ target_include_directories(NexusEngine PUBLIC
   ${CMAKE_SOURCE_DIR}/extern/imgui
 )
 
+target_compile_definitions(NexusEngine
+  PUBLIC
+    NEXUS_ENGINE_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+    NEXUS_ENGINE_SHADER_CACHE_DIR="${CMAKE_BINARY_DIR}/shadercache"
+)
+
 # Diligent core
 target_link_libraries(NexusEngine
   PUBLIC
@@ -71,4 +77,8 @@ endif()
 
 if(MSVC)
   target_compile_options(NexusEngine PRIVATE /permissive- /W4 /EHsc /bigobj)
+endif()
+
+if(WIN32)
+  target_link_libraries(NexusEngine PRIVATE d3dcompiler)
 endif()

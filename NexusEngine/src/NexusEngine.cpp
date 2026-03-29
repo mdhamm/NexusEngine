@@ -4,7 +4,6 @@
 //#include <backends/imgui_impl_sdl2.h>
 
 #include <chrono>
-#include <cmath>
 #include <algorithm>
 
 using namespace Diligent;
@@ -117,25 +116,21 @@ namespace NexusEngine
 
     void Engine::Tick(float dt)
     {
+        SDL_Event e{};
+        while (SDL_PollEvent(&e))
+        {
+            if (e.type == SDL_QUIT)
+            {
+                m_shutdown = true;
+            }
+
+            ProcessSDLEvent(e);
+        }
+
         if (m_activeScene)
         {
             m_activeScene->Update(dt);
         }
-
-        // Clear swapchain (animated color demo)
-        static float t_ = 0.f;
-        t_ += dt;
-        const float r = 0.10f + 0.05f * std::sin(t_ * 1.7f);
-        const float g = 0.12f + 0.05f * std::sin(t_ * 1.3f + 1.0f);
-        const float b = 0.16f + 0.05f * std::sin(t_ * 0.9f + 2.0f);
-        m_graphicsRenderer.BeginFrame(r, g, b, 1.0f);
-        
-        if (m_activeScene)
-        {
-            m_activeScene->Render();
-        }
-
-        m_graphicsRenderer.EndFrame();
     }
 
     // --------------------------------------------------------------
