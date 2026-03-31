@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <flecs.h>
 
 namespace SampleGame
@@ -141,12 +142,12 @@ namespace SampleGame
 
                 if (cubeMesh && unlitMaterial)
                 {
-                    constexpr int CubeCountX = 10;
-                    constexpr int CubeCountZ = 10;
-                    constexpr float Spacing = 0.35f;
+                    constexpr int CubeCountX = 50;
+                    constexpr int CubeCountZ = 50;
+                    constexpr float Spacing = 1.0f;
                     constexpr float NoiseFrequency = 0.045f;
                     constexpr float HeightScale = 6.0f;
-                    constexpr float BaseScale = 0.12f;
+                    constexpr float BaseScale = 1.0f;
 
                     for (int z = 0; z < CubeCountZ; ++z)
                     {
@@ -175,7 +176,10 @@ namespace SampleGame
                     }
 
                     auto parentCube = w.entity("ParentCube")
-                        .set(NexusEngine::TransformComponent{})
+                        .set(NexusEngine::TransformComponent::FromLocal(
+                            Diligent::float3(0.0f, 5.0f, 0.0f),
+                            NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                            Diligent::float3(1.0f, 1.0f, 1.0f)))
                         .set(RotationSpeed{ 0.35f, 0.7f, 0.0f });
 
                     auto* parentRenderMesh = parentCube.get_mut<NexusEngine::RenderMeshComponent>();
@@ -309,6 +313,28 @@ namespace SampleGame
                             localRotation = NexusEngine::Quaternion::Normalize(localRotation);
 
                             NexusEngine::SetLocalRotation(entity, localRotation);
+                        }
+                    });
+
+            w.system<>("PrintFps")
+                .kind(flecs::OnUpdate)
+                .iter(
+                    [](flecs::iter& it)
+                    {
+                        static float s_accumulatedSeconds = 0.0f;
+                        static int s_accumulatedFrames = 0;
+                        constexpr float ReportIntervalSeconds = 1.0f;
+
+                        s_accumulatedSeconds += static_cast<float>(it.delta_time());
+                        ++s_accumulatedFrames;
+
+                        if (s_accumulatedSeconds >= ReportIntervalSeconds)
+                        {
+                            const float fps = static_cast<float>(s_accumulatedFrames) / s_accumulatedSeconds;
+                            std::fprintf(stdout, "FPS: %.1f\n", fps);
+
+                            s_accumulatedSeconds = 0.0f;
+                            s_accumulatedFrames = 0;
                         }
                     });
         }
