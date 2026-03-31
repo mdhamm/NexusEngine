@@ -85,6 +85,62 @@ namespace NexusEngine
             return FromEuler(eulerRadians.x, eulerRadians.y, eulerRadians.z);
         }
 
+        static Diligent::float3 ToEuler(const Quaternion& q)
+        {
+            const Quaternion n = Normalize(q);
+
+            const float xx = n.x * n.x;
+            const float yy = n.y * n.y;
+            const float zz = n.z * n.z;
+            const float xy = n.x * n.y;
+            const float xz = n.x * n.z;
+            const float yz = n.y * n.z;
+            const float wx = n.w * n.x;
+            const float wy = n.w * n.y;
+            const float wz = n.w * n.z;
+
+            // Rotation matrix from quaternion
+            const float m00 = 1.0f - 2.0f * (yy + zz);
+            const float m01 = 2.0f * (xy - wz);
+            const float m02 = 2.0f * (xz + wy);
+
+            const float m10 = 2.0f * (xy + wz);
+            const float m11 = 1.0f - 2.0f * (xx + zz);
+            const float m12 = 2.0f * (yz - wx);
+
+            const float m20 = 2.0f * (xz - wy);
+            const float m21 = 2.0f * (yz + wx);
+            const float m22 = 1.0f - 2.0f * (xx + yy);
+
+            // Matches FromEuler = qx * qy * qz
+            // pitch = rotation around X
+            // yaw   = rotation around Y
+            // roll  = rotation around Z
+
+            Diligent::float3 euler;
+
+            const float sy = std::clamp(m02, -1.0f, 1.0f);
+            euler.y = std::asin(sy);
+
+            const float cosY = std::cos(euler.y);
+
+            // Check for gimbal lock
+            if (std::fabs(cosY) > 1e-6f)
+            {
+                euler.x = std::atan2(-m12, m22);
+                euler.z = std::atan2(-m01, m00);
+            }
+            else
+            {
+                // Gimbal lock fallback
+                // roll set to 0, solve pitch from remaining terms
+                euler.x = std::atan2(m21, m11);
+                euler.z = 0.0f;
+            }
+
+            return euler;
+        }
+
         static Diligent::float3 Rotate(const Quaternion& q, const Diligent::float3& v)
         {
             const Quaternion nq = Normalize(q);
@@ -92,6 +148,16 @@ namespace NexusEngine
 
             const Quaternion rq = Multiply(Multiply(nq, vq), Conjugate(nq));
             return Diligent::float3(rq.x, rq.y, rq.z);
+        }
+
+        static Diligent::float3 Foward(const Quaternion& q)
+        {
+            return Rotate(q, Diligent::float3(0.0f, 0.0f, -1.0f));
+        }
+
+        static Diligent::float3 Right(const Quaternion& q)
+        {
+            return Rotate(q, Diligent::float3(1.0f, 0.0f, 0.0f));
         }
     };
 

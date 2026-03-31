@@ -95,6 +95,9 @@ namespace SampleGame
     {
         float m_moveSpeed = 12.0f;
         float m_lookSensitivity = 0.003f;
+        float m_yaw = 0.0f;
+        float m_pitch = 0.0f;
+        bool m_isRotationInitialized = false;
     };
 
     struct RotationSpeed { float m_x = 0, m_y = 0, m_z = 0; };
@@ -111,7 +114,9 @@ namespace SampleGame
             // Register components
             w.component<FlyCameraControllerComponent>()
                 .member<float>("moveSpeed")
-                .member<float>("lookSensitivity");
+                .member<float>("lookSensitivity")
+                .member<float>("yaw")
+                .member<float>("pitch");
             w.component<RotationSpeed>().member<float>("x").member<float>("y").member<float>("z");
 
             SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -222,22 +227,28 @@ namespace SampleGame
                             flecs::entity entity = it.entity(i);
 
                             auto& transform = transforms[i];
-                            const auto& controller = controllers[i];
+                            auto& controller = controllers[i];
 
-                            auto worldRotation = transform.GetWorldRotation();
+                            if (!controller.m_isRotationInitialized)
+                            {
+                                const Diligent::float3 initialEuler = NexusEngine::Quaternion::ToEuler(transform.GetWorldRotation());
+                                controller.m_pitch = initialEuler.x;
+                                controller.m_yaw = initialEuler.y;
+                                controller.m_isRotationInitialized = true;
+                            }
 
-                            float deltaYaw = -static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
-                            float deltaPitch = -static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
+                            const float deltaYaw = -static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
+                            const float deltaPitch = -static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
+                            constexpr float MaxPitch = Diligent::PI_F * 0.5f - 0.01f;
 
-                            auto incrementalYaw = NexusEngine::Quaternion::FromEuler(0.0f, deltaYaw, 0.0f);
-                            auto incrementalPitch = NexusEngine::Quaternion::FromEuler(deltaPitch, 0.0f, 0.0f);
+                            controller.m_yaw += deltaYaw;
+                            controller.m_pitch = std::clamp(controller.m_pitch + deltaPitch, -MaxPitch, MaxPitch);
 
-                            worldRotation = NexusEngine::Quaternion::Normalize(NexusEngine::Quaternion::Multiply(worldRotation, incrementalPitch));
-                            worldRotation = NexusEngine::Quaternion::Normalize(NexusEngine::Quaternion::Multiply(worldRotation, incrementalYaw));
+                            NexusEngine::Quaternion worldRotation = NexusEngine::Quaternion::FromEuler(0.0f, controller.m_yaw, 0.0f);
+                            worldRotation = NexusEngine::Quaternion::Multiply(worldRotation, NexusEngine::Quaternion::FromEuler(controller.m_pitch, 0.0f, 0.0f));
 
-                            const Diligent::float3 forward = NexusEngine::Quaternion::Rotate(worldRotation, Diligent::float3(0.0f, 0.0f, -1.0f));
-
-                            const Diligent::float3 right = NexusEngine::Quaternion::Rotate(worldRotation, Diligent::float3(1.0f, 0.0f, 0.0f));
+                            const Diligent::float3 forward = NexusEngine::Quaternion::Foward(worldRotation);
+                            const Diligent::float3 right = NexusEngine::Quaternion::Right(worldRotation);
 
                             NexusEngine::SetWorldRotation(entity, worldRotation);
 
@@ -262,7 +273,7 @@ namespace SampleGame
                             if (Diligent::length(movement) > 0.0f)
                             {
                                 movement = Diligent::normalize(movement) * (controller.m_moveSpeed * dt);
-                                NexusEngine::SetLocalPosition(entity, transform.GetWorldPosition() + movement);
+                                NexusEngine::SetWorldPosition(entity, transform.GetWorldPosition() + movement);
                             }
                         }
                     });
