@@ -15,6 +15,24 @@
 using namespace Diligent;
 namespace NexusEngine
 {
+    namespace
+    {
+        Diligent::float4x4 CreateRightHandedProjectionMatrix(float fov, float aspectRatio, float zNear, float zFar)
+        {
+            const float yScale = 1.0f / std::tan(fov * 0.5f);
+            const float xScale = yScale / aspectRatio;
+
+            Diligent::float4x4 projection = Diligent::float4x4::Identity();
+            projection._11 = xScale;
+            projection._22 = yScale;
+            projection._33 = zFar / (zNear - zFar);
+            projection._34 = -1.0f;
+            projection._43 = (zNear * zFar) / (zNear - zFar);
+            projection._44 = 0.0f;
+            return projection;
+        }
+    }
+
     Scene::Scene(GraphicsRenderer& graphicsRenderer, const std::string& name)
         : m_name(name)
         , m_graphicsRenderer(graphicsRenderer)
@@ -100,43 +118,6 @@ namespace NexusEngine
 
     void Scene::RegisterSystems()
     {
-        m_world.system<TransformComponent, const TransformComponent>("PropagateTransforms")
-            .kind<TransformPhase>()
-            .term_at(2).cascade(flecs::ChildOf).optional()
-            .iter(
-                [](flecs::iter& it, TransformComponent* transforms, const TransformComponent* parentTransforms)
-                {
-                    for (auto i : it)
-                    {
-                        auto& transform = transforms[i];
-                        const TransformComponent* parentTransform = it.is_set(2) ? parentTransforms : nullptr;
-
-                        if (parentTransform)
-                        {
-                            transform.m_worldPosition =
-                                parentTransform->m_worldPosition + transform.m_localPosition;
-
-                            transform.m_worldRotation =
-                                parentTransform->m_worldRotation + transform.m_localRotation;
-
-                            transform.m_worldScale = Diligent::float3(
-                                parentTransform->m_worldScale.x * transform.m_localScale.x,
-                                parentTransform->m_worldScale.y * transform.m_localScale.y,
-                                parentTransform->m_worldScale.z * transform.m_localScale.z);
-
-                            transform.m_worldMatrix =
-                                transform.GetLocalMatrix() * parentTransform->GetWorldMatrix();
-                        }
-                        else
-                        {
-                            transform.m_worldPosition = transform.m_localPosition;
-                            transform.m_worldRotation = transform.m_localRotation;
-                            transform.m_worldScale = transform.m_localScale;
-                            transform.m_worldMatrix = transform.GetLocalMatrix();
-                        }
-                    }
-                });
-
         m_world.system<>("BeginFrame")
             .kind<RenderPrepPhase>()
             .iter(
@@ -170,18 +151,17 @@ namespace NexusEngine
 
                     if (cam.m_target == CameraComponent::Target::SwapChain)
                     {
-                        Diligent::float4x4 viewMatrix = Diligent::float4x4::Translation(0.0f, 0.0f, 5.0f);
+                        Diligent::float4x4 viewMatrix = Diligent::float4x4::Translation(0.0f, 0.0f, -5.0f);
                         if (const auto* cameraTransform = cameraEntity.get<TransformComponent>())
                         {
                             viewMatrix = cameraTransform->GetWorldMatrix().Inverse();
                         }
 
-                        Diligent::float4x4 projMatrix = Diligent::float4x4::Projection(
+                        Diligent::float4x4 projMatrix = CreateRightHandedProjectionMatrix(
                             Diligent::PI_F / 4.0f,
                             aspect,
                             0.1f,
-                            1000.0f,
-                            false);
+                            1000.0f);
                         Diligent::float4x4 viewProjMatrix = viewMatrix * projMatrix;
 
                         m_world.each<RenderMeshComponent>(

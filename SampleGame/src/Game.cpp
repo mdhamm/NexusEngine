@@ -104,9 +104,9 @@ namespace SampleGame
     public:
         void OnStartup(NexusEngine::Engine& engine) override
         {
-            auto* scene = &engine.CreateScene("MainScene");
+            auto& scene = engine.CreateScene("MainScene");
             engine.SetActiveScene("MainScene");
-            auto& w = scene->m_world;
+            auto& w = scene.m_world;
 
             // Register components
             w.component<FlyCameraControllerComponent>()
@@ -119,15 +119,14 @@ namespace SampleGame
             // Create a default camera
             auto camera = w.entity("MainCamera")
                 .set(NexusEngine::CameraComponent{})
-                .set(NexusEngine::TransformComponent{
-                    .m_localPosition = Diligent::float3(0.0f, 6.0f, -18.0f),
-                    .m_localRotation = Diligent::float3(-0.25f, 0.0f, 0.0f),
-                    .m_localScale = Diligent::float3(1.0f, 1.0f, 1.0f)
-                })
+                .set(NexusEngine::TransformComponent::FromLocal(
+                    Diligent::float3(0.0f, 0.0f, 18.0f),
+                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                    Diligent::float3(1.0f, 1.0f, 1.0f)))
                 .set(FlyCameraControllerComponent{});
 
             // Create rendering resources using the factory
-            auto* factory = scene->GetResourceFactory();
+            auto* factory = scene.GetResourceFactory();
             if (factory)
             {
                 // Create shared resources
@@ -155,14 +154,13 @@ namespace SampleGame
                             const float heightScaleBias = noise > 0.0f ? noise * 0.15f : 0.0f;
 
                             auto noiseCube = w.entity()
-                                .set(NexusEngine::TransformComponent{
-                                    .m_localPosition = Diligent::float3(
+                                .set(NexusEngine::TransformComponent::FromLocal(
+                                    Diligent::float3(
                                         (static_cast<float>(x) - static_cast<float>(CubeCountX) * 0.5f) * Spacing,
                                         height,
                                         (static_cast<float>(z) - static_cast<float>(CubeCountZ) * 0.5f) * Spacing),
-                                    .m_localRotation = Diligent::float3(0.0f, 0.0f, 0.0f),
-                                    .m_localScale = Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)
-                                });
+                                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                                    Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)));
 
                             auto* noiseRenderMesh = noiseCube.get_mut<NexusEngine::RenderMeshComponent>();
                             noiseRenderMesh->mesh = cubeMesh;
@@ -183,11 +181,10 @@ namespace SampleGame
                     // Create rotating cube entity as a child of the parent cube
                     auto cube = w.entity("RotatingCube")
                         .child_of(parentCube)
-                        .set(NexusEngine::TransformComponent{
-                            .m_localPosition = Diligent::float3(1.0f, 0.0f, 0.0f),
-                            .m_localRotation = Diligent::float3(0.0f, 0.0f, 0.0f),
-                            .m_localScale = Diligent::float3(0.3f, 0.3f, 0.3f)
-                        })
+                        .set(NexusEngine::TransformComponent::FromLocal(
+                            Diligent::float3(1.0f, 0.0f, 0.0f),
+                            NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                            Diligent::float3(0.3f, 0.3f, 0.3f)))
                         .set(RotationSpeed{ 0.0f, 1.0f, 0.5f });
 
                     auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();
@@ -196,6 +193,18 @@ namespace SampleGame
                     renderMesh->visible = true;
                 }
             }
+
+            RegisterSystems(scene);
+        }
+
+        void OnShutdown(NexusEngine::Engine&) override
+        {
+        }
+
+    private:
+        void RegisterSystems(NexusEngine::Scene& scene)
+        {
+            flecs::world& w = scene.m_world;
 
             w.system<NexusEngine::TransformComponent, FlyCameraControllerComponent, NexusEngine::CameraComponent>("UpdateFlyCamera")
                 .kind(flecs::OnUpdate)
@@ -210,30 +219,36 @@ namespace SampleGame
 
                         for (auto i : it)
                         {
+                            flecs::entity entity = it.entity(i);
+
                             auto& transform = transforms[i];
                             const auto& controller = controllers[i];
 
-                            transform.m_localRotation.y += static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
-                            transform.m_localRotation.x += static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
-                            transform.m_localRotation.x = std::clamp(transform.m_localRotation.x, -1.55f, 1.55f);
+                            auto worldRotation = transform.GetWorldRotation();
 
-                            const Diligent::float4x4 rotationMatrix =
-                                Diligent::float4x4::RotationZ(transform.m_localRotation.z) *
-                                Diligent::float4x4::RotationY(transform.m_localRotation.y) *
-                                Diligent::float4x4::RotationX(transform.m_localRotation.x);
+                            float deltaYaw = -static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
+                            float deltaPitch = -static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
 
-                            const Diligent::float3 look = Diligent::normalize(Diligent::float3(0.0f, 0.0f, 1.0f) * rotationMatrix);
-                            const Diligent::float3 up = Diligent::normalize(Diligent::float3(0.0f, 1.0f, 0.0f) * rotationMatrix);
-                            const Diligent::float3 right = Diligent::normalize(Diligent::cross(up, look));
+                            auto incrementalYaw = NexusEngine::Quaternion::FromEuler(0.0f, deltaYaw, 0.0f);
+                            auto incrementalPitch = NexusEngine::Quaternion::FromEuler(deltaPitch, 0.0f, 0.0f);
+
+                            worldRotation = NexusEngine::Quaternion::Normalize(NexusEngine::Quaternion::Multiply(worldRotation, incrementalPitch));
+                            worldRotation = NexusEngine::Quaternion::Normalize(NexusEngine::Quaternion::Multiply(worldRotation, incrementalYaw));
+
+                            const Diligent::float3 forward = NexusEngine::Quaternion::Rotate(worldRotation, Diligent::float3(0.0f, 0.0f, -1.0f));
+
+                            const Diligent::float3 right = NexusEngine::Quaternion::Rotate(worldRotation, Diligent::float3(1.0f, 0.0f, 0.0f));
+
+                            NexusEngine::SetWorldRotation(entity, worldRotation);
 
                             Diligent::float3 movement(0.0f, 0.0f, 0.0f);
                             if (keyboardState[SDL_SCANCODE_W])
                             {
-                                movement += look;
+                                movement += forward;
                             }
                             if (keyboardState[SDL_SCANCODE_S])
                             {
-                                movement -= look;
+                                movement -= forward;
                             }
                             if (keyboardState[SDL_SCANCODE_D])
                             {
@@ -247,7 +262,7 @@ namespace SampleGame
                             if (Diligent::length(movement) > 0.0f)
                             {
                                 movement = Diligent::normalize(movement) * (controller.m_moveSpeed * dt);
-                                transform.m_localPosition += movement;
+                                NexusEngine::SetLocalPosition(entity, transform.GetWorldPosition() + movement);
                             }
                         }
                     });
@@ -261,35 +276,30 @@ namespace SampleGame
                         const float dt = static_cast<float>(it.delta_time());
                         for (auto i : it)
                         {
-                            transforms[i].m_localRotation.x += speeds[i].m_x * dt;
-                            transforms[i].m_localRotation.y += speeds[i].m_y * dt;
-                            transforms[i].m_localRotation.z += speeds[i].m_z * dt;
+                            flecs::entity entity = it.entity(i);
+                            auto& transform = transforms[i];
+                            const auto& speed = speeds[i];
+
+                            // Current rotation (quaternion)
+                            auto localRotation = transform.GetLocalRotation();
+
+                            // Build delta rotation from angular velocity (radians/sec * dt)
+                            const float pitch = speed.m_x * dt;
+                            const float yaw = speed.m_y * dt;
+                            const float roll = speed.m_z * dt;
+
+                            const auto deltaRotation =
+                                NexusEngine::Quaternion::FromEuler(pitch, yaw, roll);
+
+                            // Apply rotation (order matters!)
+                            localRotation = NexusEngine::Quaternion::Multiply(localRotation, deltaRotation);
+
+                            // Normalize to avoid drift
+                            localRotation = NexusEngine::Quaternion::Normalize(localRotation);
+
+                            NexusEngine::SetLocalRotation(entity, localRotation);
                         }
                     });
-
-            // 3) AI: run every 0.1 seconds (NOT every frame)
-            w.system<>("AI_Tick")
-                .kind(flecs::OnUpdate)
-                .interval(0.1f)
-                .iter(
-                    [](flecs::iter& it)
-                    {
-                        (void)it;
-                    });
-
-            // 4) Expensive culling: run once every 4 frames
-            w.system<>("VisibilityCulling")
-                .kind(flecs::PostUpdate)
-                .rate(4)
-                .iter(
-                    [](flecs::iter& it)
-                    {
-                        (void)it;
-                    });
-        }
-
-        void OnShutdown(NexusEngine::Engine&) override
-        {
         }
     };
 
