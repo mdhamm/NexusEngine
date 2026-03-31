@@ -142,8 +142,8 @@ namespace SampleGame
 
                 if (cubeMesh && unlitMaterial)
                 {
-                    constexpr int CubeCountX = 50;
-                    constexpr int CubeCountZ = 50;
+                    constexpr int CubeCountX = 100;
+                    constexpr int CubeCountZ = 100;
                     constexpr float Spacing = 1.0f;
                     constexpr float NoiseFrequency = 0.045f;
                     constexpr float HeightScale = 6.0f;

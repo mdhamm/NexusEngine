@@ -11,12 +11,37 @@
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 
 #include <cmath>
+#include <cstring>
+#include <unordered_map>
 
 using namespace Diligent;
 namespace NexusEngine
 {
     namespace
     {
+        struct InstanceTransformData
+        {
+            Diligent::float4x4 m_world;
+        };
+
+        struct InstancingBatchKey
+        {
+            Mesh* m_mesh = nullptr;
+            Material* m_material = nullptr;
+
+            bool operator==(const InstancingBatchKey& other) const = default;
+        };
+
+        struct InstancingBatchKeyHasher
+        {
+            size_t operator()(const InstancingBatchKey& key) const noexcept
+            {
+                const size_t meshHash = std::hash<std::uintptr_t>{}(reinterpret_cast<std::uintptr_t>(key.m_mesh));
+                const size_t materialHash = std::hash<std::uintptr_t>{}(reinterpret_cast<std::uintptr_t>(key.m_material));
+                return (meshHash * 1315423911u) ^ materialHash;
+            }
+        };
+
         Diligent::float4x4 CreateRightHandedProjectionMatrix(float fov, float aspectRatio, float zNear, float zFar)
         {
             const float yScale = 1.0f / std::tan(fov * 0.5f);
@@ -30,6 +55,13 @@ namespace NexusEngine
             projection._43 = (zNear * zFar) / (zNear - zFar);
             projection._44 = 0.0f;
             return projection;
+        }
+
+        InstanceTransformData CreateInstanceTransformData(const TransformComponent* transform)
+        {
+            InstanceTransformData instanceData{};
+            instanceData.m_world = transform ? transform->GetWorldMatrix() : Diligent::float4x4::Identity();
+            return instanceData;
         }
     }
 
@@ -164,6 +196,19 @@ namespace NexusEngine
                             1000.0f);
                         Diligent::float4x4 viewProjMatrix = viewMatrix * projMatrix;
 
+                        using BatchMap = std::unordered_map<InstancingBatchKey, std::vector<InstanceTransformData>, InstancingBatchKeyHasher>;
+
+                        struct SingleDraw
+                        {
+                            Mesh* m_mesh = nullptr;
+                            Material* m_material = nullptr;
+                            IShaderResourceBinding* m_srb = nullptr;
+                            InstanceTransformData m_instanceData{};
+                        };
+
+                        BatchMap instancedBatches;
+                        std::vector<SingleDraw> singleDraws;
+
                         m_world.each<RenderMeshComponent>(
                             [&](flecs::entity meshEntity, RenderMeshComponent& renderMesh)
                             {
@@ -172,83 +217,75 @@ namespace NexusEngine
                                     return;
                                 }
 
-                                Mesh* mesh = renderMesh.mesh;
-                                Material* material = renderMesh.material;
+                                const InstanceTransformData instanceData = CreateInstanceTransformData(meshEntity.get<TransformComponent>());
 
-                                auto* cachedPipeline = m_resourceFactory
-                                    ? m_resourceFactory->GetOrCreatePipeline(material, mesh, rtvFormat, dsvFormat)
-                                    : nullptr;
-                                if (!cachedPipeline || !cachedPipeline->m_pipelineState)
+                                if (renderMesh.instanceSRB || renderMesh.instanceConstantBuffer)
+                                {
+                                    singleDraws.push_back(SingleDraw{
+                                        renderMesh.mesh,
+                                        renderMesh.material,
+                                        renderMesh.instanceSRB.RawPtr(),
+                                        instanceData });
+                                    return;
+                                }
+
+                                instancedBatches[InstancingBatchKey{ renderMesh.mesh, renderMesh.material }].push_back(instanceData);
+                            });
+
+                        auto drawInstances =
+                            [&](Mesh* mesh, Material* material, IShaderResourceBinding* explicitSrb, const InstanceTransformData* instanceData, Uint32 instanceCount)
+                            {
+                                if (!mesh || !material || !instanceData || instanceCount == 0)
                                 {
                                     return;
                                 }
 
-                                Diligent::float4x4 worldMatrix = Diligent::float4x4::Identity();
-                                if (auto* transform = meshEntity.get<TransformComponent>())
+                                auto* cachedPipeline = m_resourceFactory
+                                    ? m_resourceFactory->GetOrCreatePipeline(material, mesh, rtvFormat, dsvFormat)
+                                    : nullptr;
+                                if (!cachedPipeline || !cachedPipeline->m_pipelineState || !mesh->vertexBuffer)
                                 {
-                                    worldMatrix = transform->GetWorldMatrix();
+                                    return;
                                 }
 
-                                ctx->SetPipelineState(cachedPipeline->m_pipelineState);
-
-                                IShaderResourceBinding* srb = renderMesh.instanceSRB
-                                    ? renderMesh.instanceSRB.RawPtr()
+                                IShaderResourceBinding* srb = explicitSrb
+                                    ? explicitSrb
                                     : cachedPipeline->m_shaderResourceBindingTemplate.RawPtr();
-                                if (!srb)
+                                if (!srb || !EnsureInstanceTransformBufferCapacity(instanceCount))
                                 {
                                     return;
                                 }
 
                                 if (material->materialConstantBuffer)
                                 {
-                                    struct VSConstants
-                                    {
-                                        Diligent::float4x4 WorldViewProj;
-                                        Diligent::float4x4 World;
-                                    };
-
-                                    const auto& bufDesc = material->materialConstantBuffer->GetDesc();
-                                    const Diligent::float4x4 worldViewProj = worldMatrix * viewProjMatrix;
-                                    const Diligent::float4x4 worldViewProjT = worldViewProj.Transpose();
-                                    const Diligent::float4x4 worldMatrixT = worldMatrix.Transpose();
-
-                                    if (bufDesc.Size >= sizeof(VSConstants))
-                                    {
-                                        VSConstants constants{};
-                                        constants.World = worldMatrixT;
-                                        constants.WorldViewProj = worldViewProjT;
-
-                                        MapHelper<VSConstants> mappedData(
-                                            ctx,
-                                            material->materialConstantBuffer,
-                                            MAP_WRITE,
-                                            MAP_FLAG_DISCARD);
-                                        *mappedData = constants;
-                                    }
-                                    else
-                                    {
-                                        MapHelper<Diligent::float4x4> mappedData(
-                                            ctx,
-                                            material->materialConstantBuffer,
-                                            MAP_WRITE,
-                                            MAP_FLAG_DISCARD);
-                                        *mappedData = worldViewProjT;
-                                    }
+                                    const Diligent::float4x4 viewProjMatrixT = viewProjMatrix.Transpose();
+                                    MapHelper<Diligent::float4x4> mappedData(
+                                        ctx,
+                                        material->materialConstantBuffer,
+                                        MAP_WRITE,
+                                        MAP_FLAG_DISCARD);
+                                    *mappedData = viewProjMatrixT;
                                 }
 
+                                MapHelper<InstanceTransformData> mappedInstances(
+                                    ctx,
+                                    m_instanceTransformBuffer,
+                                    MAP_WRITE,
+                                    MAP_FLAG_DISCARD);
+                                std::memcpy(mappedInstances, instanceData, sizeof(InstanceTransformData) * instanceCount);
+
+                                ctx->SetPipelineState(cachedPipeline->m_pipelineState);
                                 ctx->CommitShaderResources(srb, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-                                if (mesh->vertexBuffer)
-                                {
-                                    IBuffer* vertexBuffers[] = { mesh->vertexBuffer };
-                                    Uint64 offsets[] = { 0 };
-                                    ctx->SetVertexBuffers(
-                                        0, 1,
-                                        vertexBuffers,
-                                        offsets,
-                                        RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
-                                        SET_VERTEX_BUFFERS_FLAG_RESET);
-                                }
+                                IBuffer* vertexBuffers[] = { mesh->vertexBuffer, m_instanceTransformBuffer };
+                                Uint64 offsets[] = { 0, 0 };
+                                ctx->SetVertexBuffers(
+                                    0,
+                                    2,
+                                    vertexBuffers,
+                                    offsets,
+                                    RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
+                                    SET_VERTEX_BUFFERS_FLAG_RESET);
 
                                 if (mesh->indexBuffer && mesh->indexCount > 0)
                                 {
@@ -260,6 +297,7 @@ namespace NexusEngine
                                     DrawIndexedAttribs drawAttrs;
                                     drawAttrs.IndexType = VT_UINT32;
                                     drawAttrs.NumIndices = mesh->indexCount;
+                                    drawAttrs.NumInstances = instanceCount;
                                     drawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 
                                     ctx->DrawIndexed(drawAttrs);
@@ -268,11 +306,27 @@ namespace NexusEngine
                                 {
                                     DrawAttribs drawAttrs;
                                     drawAttrs.NumVertices = mesh->vertexCount;
+                                    drawAttrs.NumInstances = instanceCount;
                                     drawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 
                                     ctx->Draw(drawAttrs);
                                 }
-                            });
+                            };
+
+                        for (auto& [batchKey, batchInstances] : instancedBatches)
+                        {
+                            drawInstances(
+                                batchKey.m_mesh,
+                                batchKey.m_material,
+                                nullptr,
+                                batchInstances.data(),
+                                static_cast<Uint32>(batchInstances.size()));
+                        }
+
+                        for (const SingleDraw& draw : singleDraws)
+                        {
+                            drawInstances(draw.m_mesh, draw.m_material, draw.m_srb, &draw.m_instanceData, 1);
+                        }
                     }
                     else if (cam.m_target == CameraComponent::Target::RenderTexture)
                     {
@@ -288,6 +342,49 @@ namespace NexusEngine
                 {
                     m_graphicsRenderer.EndFrame();
                 });
+    }
+
+    bool Scene::EnsureInstanceTransformBufferCapacity(Diligent::Uint32 instanceCount)
+    {
+        if (instanceCount == 0)
+        {
+            return false;
+        }
+
+        if (m_instanceTransformBuffer && m_instanceTransformCapacity >= instanceCount)
+        {
+            return true;
+        }
+
+        auto* device = m_graphicsRenderer.m_gfx.m_device.RawPtr();
+        if (!device)
+        {
+            return false;
+        }
+
+        Diligent::Uint32 newCapacity = m_instanceTransformCapacity > 0 ? m_instanceTransformCapacity : 1;
+        while (newCapacity < instanceCount)
+        {
+            newCapacity *= 2;
+        }
+
+        BufferDesc bufferDesc;
+        bufferDesc.Name = "Scene.InstanceTransforms";
+        bufferDesc.Usage = USAGE_DYNAMIC;
+        bufferDesc.BindFlags = BIND_VERTEX_BUFFER;
+        bufferDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
+        bufferDesc.Size = sizeof(InstanceTransformData) * newCapacity;
+
+        Diligent::RefCntAutoPtr<Diligent::IBuffer> buffer;
+        device->CreateBuffer(bufferDesc, nullptr, &buffer);
+        if (!buffer)
+        {
+            return false;
+        }
+
+        m_instanceTransformBuffer = std::move(buffer);
+        m_instanceTransformCapacity = newCapacity;
+        return true;
     }
 } // namespace NexusEngine
 

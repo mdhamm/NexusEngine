@@ -36,6 +36,19 @@ namespace NexusEngine
     {
         namespace fs = std::filesystem;
 
+        std::vector<LayoutElement> CreateInstancedPosNormalUvLayout()
+        {
+            return {
+                LayoutElement{0, 0, 3, VT_FLOAT32, False},
+                LayoutElement{1, 0, 3, VT_FLOAT32, False},
+                LayoutElement{2, 0, 2, VT_FLOAT32, False},
+                LayoutElement{3, 1, 4, VT_FLOAT32, False, 0,  sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
+                LayoutElement{4, 1, 4, VT_FLOAT32, False, 16, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
+                LayoutElement{5, 1, 4, VT_FLOAT32, False, 32, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
+                LayoutElement{6, 1, 4, VT_FLOAT32, False, 48, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE}
+            };
+        }
+
         fs::path GetShaderSourceRoot()
         {
             return fs::path{NEXUS_ENGINE_SHADER_SOURCE_DIR};
@@ -427,11 +440,7 @@ namespace NexusEngine
 
     Material* RenderResourceFactory::CreateDefaultMaterial()
     {
-        std::vector<LayoutElement> layout = {
-            LayoutElement{0, 0, 3, VT_FLOAT32, False},
-            LayoutElement{1, 0, 3, VT_FLOAT32, False},
-            LayoutElement{2, 0, 2, VT_FLOAT32, False}
-        };
+        std::vector<LayoutElement> layout = CreateInstancedPosNormalUvLayout();
 
         Material* mat = CreateMaterialFromFiles(
             "DefaultLitMaterial",
@@ -441,19 +450,12 @@ namespace NexusEngine
 
         if (mat && m_context)
         {
-            mat->materialConstantBuffer = CreateConstantBuffer("VSConstants", 128);
+            mat->materialConstantBuffer = CreateConstantBuffer("VSConstants", 64);
 
             if (mat->materialConstantBuffer)
             {
-                struct VSConstants
-                {
-                    float4x4 WorldViewProj;
-                    float4x4 World;
-                };
-
-                MapHelper<VSConstants> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
-                mappedData->World = float4x4::Identity();
-                mappedData->WorldViewProj = float4x4::Identity();
+                MapHelper<float4x4> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
+                *mappedData = float4x4::Identity();
             }
         }
 
@@ -462,11 +464,7 @@ namespace NexusEngine
 
     Material* RenderResourceFactory::CreateUnlitMaterial()
     {
-        std::vector<LayoutElement> layout = {
-            LayoutElement{0, 0, 3, VT_FLOAT32, False},  // Position
-            LayoutElement{1, 0, 3, VT_FLOAT32, False},  // Normal
-            LayoutElement{2, 0, 2, VT_FLOAT32, False}   // UV
-        };
+        std::vector<LayoutElement> layout = CreateInstancedPosNormalUvLayout();
 
         Material* mat = CreateMaterialFromFiles(
             "UnlitMaterial",

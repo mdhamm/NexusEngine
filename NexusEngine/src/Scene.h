@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
+#include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
 
 #include "common/GraphicsRenderer.h"
@@ -50,9 +52,12 @@ namespace NexusEngine
         void RegisterSceneComponents();
         void RegisterPhases();
         void RegisterSystems();
+        bool EnsureInstanceTransformBufferCapacity(Diligent::Uint32 instanceCount);
 
         GraphicsRenderer m_graphicsRenderer;
         std::unique_ptr<RenderResourceFactory> m_resourceFactory;
+        Diligent::RefCntAutoPtr<Diligent::IBuffer> m_instanceTransformBuffer;
+        Diligent::Uint32 m_instanceTransformCapacity = 0;
         float m_clearAnimationTime = 0.0f;
     };
 
