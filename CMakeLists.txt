@@ -3,6 +3,7 @@ project(NexusRoot LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 # ---------------- Platform mode ----------------
 option(BUILD_WEB "Build for Web (Emscripten)" OFF)
@@ -11,11 +12,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 endif()
 
 # ---------------- Diligent (extern) ----------------
-# Keep only the backends we use: DX12 (desktop) + WebGPU (web)
-set(DILIGENT_NO_OPENGL       ON  CACHE BOOL "" FORCE)
+# Keep only the backend we use on desktop. The web build stays on an
+# Emscripten-only path and does not enable Diligent WebGPU.
+if(BUILD_WEB)
+  set(DILIGENT_NO_OPENGL     OFF CACHE BOOL "" FORCE)
+else()
+  set(DILIGENT_NO_OPENGL     ON  CACHE BOOL "" FORCE)
+endif()
 set(DILIGENT_NO_VULKAN       ON  CACHE BOOL "" FORCE)
 set(DILIGENT_NO_DIRECT3D11   ON  CACHE BOOL "" FORCE)
-set(DILIGENT_NO_WEBGPU       OFF CACHE BOOL "" FORCE)   # enable WebGPU support
+set(DILIGENT_NO_WEBGPU       ON  CACHE BOOL "" FORCE)
 if(NOT BUILD_WEB)
   set(DILIGENT_NO_DIRECT3D12 OFF CACHE BOOL "" FORCE)   # enable D3D12 on desktop
 endif()
@@ -24,9 +30,6 @@ set(DILIGENT_BUILD_TESTS     OFF CACHE BOOL "" FORCE)
 
 # Bring in Diligent sources (expects extern/DiligentEngine in your tree)
 add_subdirectory(extern/DiligentEngine)
-
-# ---------------- Dependencies via FetchContent ----------------
-include(FetchContent)
 
 # ---- Flecs (ECS) ----
 # Flecs config (static lib, no tests/docs/tools)
@@ -37,19 +40,14 @@ set(FLECS_TESTS    OFF CACHE BOOL "" FORCE)
 set(FLECS_DOCS     OFF CACHE BOOL "" FORCE)
 set(FLECS_SANITIZE OFF CACHE BOOL "" FORCE)
 set(FLECS_META     ON  CACHE BOOL "" FORCE)
-
-FetchContent_Declare(
-  flecs
-  GIT_REPOSITORY https://github.com/SanderMertens/flecs.git
-  GIT_TAG v3.2.0
-)
-FetchContent_MakeAvailable(flecs) # provides flecs::flecs
+add_subdirectory(extern/flecs)
 
 # ---- ImGui (docking) ----
 add_subdirectory(extern/imgui) 
 
 # ---------------- SDL2 (shared iface for apps) ----------------
 if(NOT BUILD_WEB)
+  include(FetchContent)
   # Prefer static SDL on desktop (optional)
   set(SDL_SHARED OFF CACHE BOOL "" FORCE)
   set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -115,4 +113,6 @@ endif()
 add_subdirectory(NexusEngine)   # STATIC lib (owns ImGui + bridge)
 add_subdirectory(SampleGame)    # STATIC lib
 add_subdirectory(GameRuntime)   # EXE
-add_subdirectory(Editor)        # EXE
+if(NOT BUILD_WEB)
+  add_subdirectory(Editor)      # EXE
+endif()

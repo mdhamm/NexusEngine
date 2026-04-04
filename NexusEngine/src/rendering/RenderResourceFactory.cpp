@@ -375,6 +375,7 @@ namespace NexusEngine
         Material* mat = new Material();
         mat->name = name;
         mat->m_inputLayout = inputLayout;
+        mat->cullMode = CULL_MODE_FRONT;
 
         mat->vertexShader = CreateShaderFromFile(
             vsFilePath,

@@ -142,8 +142,8 @@ namespace SampleGame
 
                 if (cubeMesh && unlitMaterial)
                 {
-                    constexpr int CubeCountX = 100;
-                    constexpr int CubeCountZ = 100;
+                    constexpr int CubeCountX = 1000;
+                    constexpr int CubeCountZ = 1000;
                     constexpr float Spacing = 1.0f;
                     constexpr float NoiseFrequency = 0.045f;
                     constexpr float HeightScale = 6.0f;
@@ -159,6 +159,12 @@ namespace SampleGame
                             const float height = noise * HeightScale;
                             const float heightScaleBias = noise > 0.0f ? noise * 0.15f : 0.0f;
 
+                            // Get a random rotation speed
+                            const float MAX_SPEED = 1.0f;
+                            float rx = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
+                            float ry = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
+                            float rz = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
+
                             auto noiseCube = w.entity()
                                 .set(NexusEngine::TransformComponent::FromLocal(
                                     Diligent::float3(
@@ -166,7 +172,9 @@ namespace SampleGame
                                         height,
                                         (static_cast<float>(z) - static_cast<float>(CubeCountZ) * 0.5f) * Spacing),
                                     NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
-                                    Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)));
+                                    Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)))
+                                .set(NexusEngine::RenderMeshComponent{});
+                                //.set(RotationSpeed{ rx, ry, rz });
 
                             auto* noiseRenderMesh = noiseCube.get_mut<NexusEngine::RenderMeshComponent>();
                             noiseRenderMesh->mesh = cubeMesh;
@@ -180,6 +188,7 @@ namespace SampleGame
                             Diligent::float3(0.0f, 5.0f, 0.0f),
                             NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
                             Diligent::float3(1.0f, 1.0f, 1.0f)))
+                        .set(NexusEngine::RenderMeshComponent{})
                         .set(RotationSpeed{ 0.35f, 0.7f, 0.0f });
 
                     auto* parentRenderMesh = parentCube.get_mut<NexusEngine::RenderMeshComponent>();
@@ -194,6 +203,7 @@ namespace SampleGame
                             Diligent::float3(1.0f, 0.0f, 0.0f),
                             NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
                             Diligent::float3(0.3f, 0.3f, 0.3f)))
+                        .set(NexusEngine::RenderMeshComponent{})
                         .set(RotationSpeed{ 0.0f, 1.0f, 0.5f });
 
                     auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();

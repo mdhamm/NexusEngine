@@ -15,9 +15,9 @@
 
 namespace Diligent
 {
-    class IDeviceContext;
-    class IRenderDevice;
-    class ISwapChain;
+    struct IDeviceContext;
+    struct IRenderDevice;
+    struct ISwapChain;
     class ImGuiImplDiligent;
 }
 
@@ -35,8 +35,8 @@ namespace NexusEngine
         /// </summary>
         /// <param name="engine">Reference to the engine, for scene management and other operations</param>
         /// <returns>True if initialization succeeded and the game can start; false to abort.</returns>
-        virtual void OnStartup(Engine& engine) {};
-        virtual void OnShutdown(Engine& engine) {};
+        virtual void OnStartup(Engine& engine) { REF(engine); };
+        virtual void OnShutdown(Engine& engine) { REF(engine); };
     };
 
     class Engine
@@ -58,6 +58,7 @@ namespace NexusEngine
         /// Starts game loop. This is a blocking call that will run until the process is terminated.
         /// </summary>
         void Start();
+        void RunFrame(float dt);
 
         // Scene management
         Scene& CreateScene(const std::string& name);
@@ -78,6 +79,7 @@ namespace NexusEngine
 
     private:
         bool m_initialized = false;
+        bool m_started = false;
         bool m_shutdown = false;
         IGameApp* m_game = nullptr;
         GraphicsRenderer m_graphicsRenderer;

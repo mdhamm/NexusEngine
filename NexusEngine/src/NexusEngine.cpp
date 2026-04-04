@@ -35,11 +35,6 @@ namespace NexusEngine
             return;
         }
 
-        if (m_game)
-        {
-            m_game->OnStartup(*this);
-        }
-
         // Game loop
         using clock = std::chrono::high_resolution_clock;
         auto lastTime = clock::now();
@@ -48,13 +43,28 @@ namespace NexusEngine
             auto now = clock::now();
             std::chrono::duration<float> delta = now - lastTime;
             lastTime = now;
-            Tick(delta.count());
+            RunFrame(delta.count());
+        }
+    }
+
+    void Engine::RunFrame(float dt)
+    {
+        assert(m_initialized);
+        if (!m_initialized || m_shutdown)
+        {
+            return;
         }
 
-        if (m_game)
+        if (!m_started)
         {
-            m_game->OnShutdown(*this);
+            m_started = true;
+            if (m_game)
+            {
+                m_game->OnStartup(*this);
+            }
         }
+
+        Tick(dt);
     }
 
     void Engine::Shutdown()
@@ -66,6 +76,12 @@ namespace NexusEngine
         }
 
         m_scenes.clear();
+
+        if (m_started && m_game)
+        {
+            m_game->OnShutdown(*this);
+            m_started = false;
+        }
     }
 
     // --------------------------------------------------------------

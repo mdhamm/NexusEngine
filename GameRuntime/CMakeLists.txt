@@ -17,10 +17,8 @@ add_executable(GameRuntime ${GAME_MAIN})
 target_link_libraries(GameRuntime PRIVATE SampleGame NEXUS_SDL)
 
 if(BUILD_WEB)
-  target_link_libraries(GameRuntime PRIVATE DILIGENT_WEBGPU NEXUS_SDL SampleGame)
   set_target_properties(GameRuntime PROPERTIES SUFFIX ".html")
   target_link_options(GameRuntime PRIVATE
-    "SHELL:--use-port=emdawnwebgpu"   # or comment and use -sUSE_WEBGPU=1 on older SDKs
     "-sUSE_SDL=2"
     "-sALLOW_MEMORY_GROWTH=1"
     "-sASSERTIONS=1"

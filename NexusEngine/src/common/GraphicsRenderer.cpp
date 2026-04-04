@@ -12,9 +12,6 @@
 #include <Windows.h>
 #include <DiligentCore/Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h>
 #include <DiligentCore/Platforms/Win32/interface/Win32NativeWindow.h>
-#elif defined(__EMSCRIPTEN__)
-#include <DiligentCore/Graphics/GraphicsEngine/interface/EngineFactoryWebGPU.h>
-#include <DiligentTools/Platform/Web/interface/WebGPUNativeWindow.h>
 #endif
 
 using namespace Diligent;
@@ -37,8 +34,8 @@ namespace NexusEngine
         scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM_SRGB;
         scDesc.DepthBufferFormat = TEX_FORMAT_D32_FLOAT;
 
-        Win32NativeWindow wnd{};
-        wnd.hWnd = static_cast<HWND>(win.m_hWnd);
+        Diligent::Win32NativeWindow wnd{};
+        wnd.hWnd = win.m_hWnd;
 
         RefCntAutoPtr<IRenderDevice>  device;
         RefCntAutoPtr<IDeviceContext> ctx;
@@ -68,31 +65,8 @@ namespace NexusEngine
         return m_gfx.m_swapchain != nullptr;
 
 #elif defined(__EMSCRIPTEN__)
-        EngineWebGPUCreateInfo engCI{};
-        RefCntAutoPtr<IEngineFactoryWebGPU> factory{ GetEngineFactoryWebGPU() };
-        if (!factory)
-        {
-            return false;
-        }
-
-        SwapChainDesc scDesc{};
-        scDesc.Width = static_cast<Uint32>(win.width);
-        scDesc.Height = static_cast<Uint32>(win.height);
-        scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM_SRGB;
-
-        WebGPUNativeWindow wnd{}; // default canvas
-
-        RefCntAutoPtr<IRenderDevice>  device;
-        RefCntAutoPtr<IDeviceContext> ctx;
-        RefCntAutoPtr<ISwapChain>     sc;
-
-        factory->CreateDeviceAndContextsWebGPU(engCI, &device, &ctx);
-        factory->CreateSwapChainWebGPU(device, ctx, scDesc, wnd, &sc);
-
-        m_gfx.device = device;
-        m_gfx.ctx = ctx;
-        m_gfx.swapchain = sc;
-        return m_gfx.swapchain != nullptr;
+        (void)win;
+        return true;
 
 #else
         (void)win;

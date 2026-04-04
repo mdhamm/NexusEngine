@@ -1,13 +1,13 @@
 #include <SDL.h>
 #include <emscripten/emscripten.h>
-#include <stdexcept>
-#include <chrono>
+
+#include <memory>
 
 #include <NexusEngine.h>
 #include <Game.h>
 
 static NexusEngine::Engine g_engine;
-static SampleGame::Game    g_game;
+static SDL_Window*         g_window = nullptr;
 
 static double g_prev_ms = 0.0;
 
@@ -18,7 +18,7 @@ static void main_loop()
     g_prev_ms = now_ms;
 
     if (dt > 0.1) dt = 0.1; // clamp
-    g_game.Update(g_engine, static_cast<float>(dt));
+    g_engine.RunFrame(static_cast<float>(dt));
 }
 
 int main()
@@ -26,22 +26,24 @@ int main()
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
         return 1;
 
-    SDL_Window* win = SDL_CreateWindow(
-        "GameRuntime (WebGPU)",
+    g_window = SDL_CreateWindow(
+        "GameRuntime (Web)",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         1280, 720,
         SDL_WINDOW_RESIZABLE
     );
-    if (!win) return 1;
+    if (!g_window) return 1;
 
-    NexusEngine::NativeWindow nw{};
-    nw.width = 1280;
-    nw.height = 720;
-
-    if (!g_engine.Initialize(nw))
+    std::unique_ptr<NexusEngine::IGameApp> game = SampleGame::CreateGame();
+    if (!game)
         return 1;
 
-    g_game.Initialize(g_engine);
+    NexusEngine::NativeWindow nw{};
+    nw.m_width = 1280;
+    nw.m_height = 720;
+
+    if (!g_engine.Initialize(nw, std::move(game)))
+        return 1;
 
     g_prev_ms = emscripten_get_now();
     emscripten_set_main_loop(main_loop, 0, 1);
