@@ -1,0 +1,3 @@
+[submodule "extern/flecs"]
+	path = extern/flecs
+	url = https://github.com/SanderMertens/flecs
