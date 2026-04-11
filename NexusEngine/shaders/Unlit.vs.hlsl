@@ -22,12 +22,12 @@ struct PSInput
 
 void main(in VSInput VSIn, out PSInput PSIn)
 {
-    const float4x4 world = float4x4(
+    float4x4 world = float4x4(
         VSIn.InstanceWorld0,
         VSIn.InstanceWorld1,
         VSIn.InstanceWorld2,
         VSIn.InstanceWorld3);
-    const float4 worldPos = mul(float4(VSIn.Pos, 1.0), world);
+    float4 worldPos = mul(float4(VSIn.Pos, 1.0), world);
 
     PSIn.Pos = mul(worldPos, g_ViewProj);
     PSIn.Color = VSIn.Normal * 0.5 + 0.5;

@@ -12,6 +12,9 @@
 #include <Windows.h>
 #include <DiligentCore/Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h>
 #include <DiligentCore/Platforms/Win32/interface/Win32NativeWindow.h>
+#elif defined(__EMSCRIPTEN__)
+#include <DiligentCore/Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h>
+#include <DiligentCore/Platforms/Emscripten/interface/EmscriptenNativeWindow.h>
 #endif
 
 using namespace Diligent;
@@ -65,8 +68,35 @@ namespace NexusEngine
         return m_gfx.m_swapchain != nullptr;
 
 #elif defined(__EMSCRIPTEN__)
-        (void)win;
-        return true;
+        EngineGLCreateInfo engCI{};
+        engCI.Window = Diligent::NativeWindow{win.m_canvasId};
+        engCI.WebGLAttribs.Alpha = false;
+        engCI.WebGLAttribs.PremultipliedAlpha = false;
+        engCI.WebGLAttribs.PreserveDrawingBuffer = false;
+
+        RefCntAutoPtr<IEngineFactoryOpenGL> factory{GetEngineFactoryOpenGL()};
+        if (!factory)
+        {
+            return false;
+        }
+
+        SwapChainDesc scDesc{};
+        scDesc.Width = static_cast<Uint32>(win.m_width);
+        scDesc.Height = static_cast<Uint32>(win.m_height);
+        scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM_SRGB;
+        scDesc.DepthBufferFormat = TEX_FORMAT_D32_FLOAT;
+
+        RefCntAutoPtr<IRenderDevice> device;
+        RefCntAutoPtr<IDeviceContext> ctx;
+        RefCntAutoPtr<ISwapChain> sc;
+
+        factory->CreateDeviceAndSwapChainGL(engCI, &device, &ctx, scDesc, &sc);
+
+        m_gfx.m_device = device;
+        m_gfx.m_ctx = ctx;
+        m_gfx.m_swapchain = sc;
+
+        return m_gfx.m_device != nullptr && m_gfx.m_ctx != nullptr && m_gfx.m_swapchain != nullptr;
 
 #else
         (void)win;

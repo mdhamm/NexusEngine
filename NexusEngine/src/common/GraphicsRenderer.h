@@ -16,6 +16,7 @@ namespace NexusEngine
         int   m_width = 1280;
         int   m_height = 720;
         void* m_hWnd = nullptr;   // HWND on Win32; void* in headers
+        const char* m_canvasId = "#canvas";
     };
 
     struct GfxContext

@@ -220,6 +220,9 @@ namespace NexusEngine
         shaderCI.EntryPoint = entryPoint;
         shaderCI.Desc.ShaderType = type;
         shaderCI.Desc.Name = name ? name : "Shader";
+#if defined(__EMSCRIPTEN__)
+        shaderCI.Desc.UseCombinedTextureSamplers = true;
+#endif
         shaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
         shaderCI.ShaderCompiler = SHADER_COMPILER_DEFAULT;
 
@@ -272,6 +275,7 @@ namespace NexusEngine
         shaderCI.EntryPoint = entryPoint;
         shaderCI.Desc.ShaderType = type;
         shaderCI.Desc.Name = name ? name : filePath;
+        shaderCI.Desc.UseCombinedTextureSamplers = true;
         shaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
         shaderCI.ShaderCompiler = SHADER_COMPILER_DEFAULT;
         m_device->CreateShader(shaderCI, &shader);

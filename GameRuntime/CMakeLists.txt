@@ -20,8 +20,12 @@ if(BUILD_WEB)
   set_target_properties(GameRuntime PROPERTIES SUFFIX ".html")
   target_link_options(GameRuntime PRIVATE
     "-sUSE_SDL=2"
-    "-sALLOW_MEMORY_GROWTH=1"
     "-sASSERTIONS=1"
+    "-sMIN_WEBGL_VERSION=2"
+    "-sMAX_WEBGL_VERSION=2"
+    "--preload-file=${CMAKE_SOURCE_DIR}/NexusEngine/shaders@/NexusEngine/shaders"
+    "-sSTACK_SIZE=524288"
+    "-sALLOW_MEMORY_GROWTH"
   )
 else()
   target_link_libraries(GameRuntime PRIVATE DILIGENT_D3D12 NEXUS_SDL SampleGame)

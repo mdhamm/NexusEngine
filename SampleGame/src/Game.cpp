@@ -120,7 +120,9 @@ namespace SampleGame
                 .member<float>("pitch");
             w.component<RotationSpeed>().member<float>("x").member<float>("y").member<float>("z");
 
+#if !defined(__EMSCRIPTEN__)
             SDL_SetRelativeMouseMode(SDL_TRUE);
+#endif
 
             // Create a default camera
             auto camera = w.entity("MainCamera")
@@ -142,8 +144,8 @@ namespace SampleGame
 
                 if (cubeMesh && unlitMaterial)
                 {
-                    constexpr int CubeCountX = 1000;
-                    constexpr int CubeCountZ = 1000;
+                    constexpr int CubeCountX = 100;
+                    constexpr int CubeCountZ = 100;
                     constexpr float Spacing = 1.0f;
                     constexpr float NoiseFrequency = 0.045f;
                     constexpr float HeightScale = 6.0f;

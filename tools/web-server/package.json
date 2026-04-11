@@ -1,0 +1,9 @@
+{
+  "name": "nexusengine-web-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static server for running the Emscripten web build with the required cross-origin isolation headers.",
+  "scripts": {
+    "start": "node server.js ../../out/build/web-debug/GameRuntime 8000"
+  }
+}

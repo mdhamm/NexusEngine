@@ -20,14 +20,17 @@ target_include_directories(NexusEngine PUBLIC
 
 target_compile_definitions(NexusEngine
   PUBLIC
-    NEXUS_ENGINE_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-    NEXUS_ENGINE_SHADER_CACHE_DIR="${CMAKE_BINARY_DIR}/shadercache"
+    $<$<BOOL:${BUILD_WEB}>:NEXUS_ENGINE_SHADER_SOURCE_DIR="/NexusEngine/shaders">
+    $<$<BOOL:${BUILD_WEB}>:NEXUS_ENGINE_SHADER_CACHE_DIR="/shadercache">
+    $<$<NOT:$<BOOL:${BUILD_WEB}>>:NEXUS_ENGINE_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders">
+    $<$<NOT:$<BOOL:${BUILD_WEB}>>:NEXUS_ENGINE_SHADER_CACHE_DIR="${CMAKE_BINARY_DIR}/shadercache">
 )
 
 # Diligent core
 target_link_libraries(NexusEngine
   PUBLIC
     Diligent-Common
+    Diligent-BuildSettings
     Diligent-GraphicsEngine
     Diligent-TargetPlatform
     NEXUS_SDL
@@ -65,6 +68,14 @@ target_include_directories(NexusEngine PRIVATE
 )
 
 target_link_libraries(NexusEngine PRIVATE imgui)
+
+if(BUILD_WEB)
+  if(TARGET Diligent-GraphicsEngineOpenGL-static)
+    target_link_libraries(NexusEngine PRIVATE Diligent-GraphicsEngineOpenGL-static)
+  elseif(TARGET Diligent-GraphicsEngineOpenGL)
+    target_link_libraries(NexusEngine PRIVATE Diligent-GraphicsEngineOpenGL)
+  endif()
+endif()
 
 # SDL for the imgui_impl_sdl2 backend
 if(TARGET NEXUS_SDL)
