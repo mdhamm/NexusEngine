@@ -21,8 +21,7 @@ if(BUILD_WEB)
   target_link_options(GameRuntime PRIVATE
     "-sUSE_SDL=2"
     "-sASSERTIONS=1"
-    "-sMIN_WEBGL_VERSION=2"
-    "-sMAX_WEBGL_VERSION=2"
+    "-sUSE_WEBGPU=1"
     "--preload-file=${CMAKE_SOURCE_DIR}/NexusEngine/shaders@/NexusEngine/shaders"
     "-sSTACK_SIZE=524288"
     "-sALLOW_MEMORY_GROWTH"

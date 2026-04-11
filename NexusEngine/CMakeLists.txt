@@ -70,11 +70,7 @@ target_include_directories(NexusEngine PRIVATE
 target_link_libraries(NexusEngine PRIVATE imgui)
 
 if(BUILD_WEB)
-  if(TARGET Diligent-GraphicsEngineOpenGL-static)
-    target_link_libraries(NexusEngine PRIVATE Diligent-GraphicsEngineOpenGL-static)
-  elseif(TARGET Diligent-GraphicsEngineOpenGL)
-    target_link_libraries(NexusEngine PRIVATE Diligent-GraphicsEngineOpenGL)
-  endif()
+  target_link_libraries(NexusEngine PRIVATE DILIGENT_WEBGPU)
 endif()
 
 # SDL for the imgui_impl_sdl2 backend

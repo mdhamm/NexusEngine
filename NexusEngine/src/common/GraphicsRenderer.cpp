@@ -13,8 +13,7 @@
 #include <DiligentCore/Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h>
 #include <DiligentCore/Platforms/Win32/interface/Win32NativeWindow.h>
 #elif defined(__EMSCRIPTEN__)
-#include <DiligentCore/Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h>
-#include <DiligentCore/Platforms/Emscripten/interface/EmscriptenNativeWindow.h>
+#include <DiligentCore/Graphics/GraphicsEngineWebGPU/interface/EngineFactoryWebGPU.h>
 #endif
 
 using namespace Diligent;
@@ -68,13 +67,9 @@ namespace NexusEngine
         return m_gfx.m_swapchain != nullptr;
 
 #elif defined(__EMSCRIPTEN__)
-        EngineGLCreateInfo engCI{};
-        engCI.Window = Diligent::NativeWindow{win.m_canvasId};
-        engCI.WebGLAttribs.Alpha = false;
-        engCI.WebGLAttribs.PremultipliedAlpha = false;
-        engCI.WebGLAttribs.PreserveDrawingBuffer = false;
+        EngineWebGPUCreateInfo engCI{};
 
-        RefCntAutoPtr<IEngineFactoryOpenGL> factory{GetEngineFactoryOpenGL()};
+        RefCntAutoPtr<IEngineFactoryWebGPU> factory{GetEngineFactoryWebGPU()};
         if (!factory)
         {
             return false;
@@ -83,14 +78,23 @@ namespace NexusEngine
         SwapChainDesc scDesc{};
         scDesc.Width = static_cast<Uint32>(win.m_width);
         scDesc.Height = static_cast<Uint32>(win.m_height);
-        scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM_SRGB;
+        scDesc.ColorBufferFormat = TEX_FORMAT_RGBA8_UNORM;
         scDesc.DepthBufferFormat = TEX_FORMAT_D32_FLOAT;
 
         RefCntAutoPtr<IRenderDevice> device;
         RefCntAutoPtr<IDeviceContext> ctx;
         RefCntAutoPtr<ISwapChain> sc;
 
-        factory->CreateDeviceAndSwapChainGL(engCI, &device, &ctx, scDesc, &sc);
+        IDeviceContext* ppContexts[] = {nullptr};
+
+        factory->CreateDeviceAndContextsWebGPU(engCI, &device, ppContexts);
+        ctx = ppContexts[0];
+        if (!device || !ctx)
+        {
+            return false;
+        }
+
+        factory->CreateSwapChainWebGPU(device, ctx, scDesc, Diligent::NativeWindow{win.m_canvasId}, &sc);
 
         m_gfx.m_device = device;
         m_gfx.m_ctx = ctx;

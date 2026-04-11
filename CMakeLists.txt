@@ -31,16 +31,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 endif()
 
 # ---------------- Diligent (extern) ----------------
-# Keep only the backend we use on desktop. The web build stays on an
-# Emscripten-only path and does not enable Diligent WebGPU.
+# Keep only the backend we use on each platform.
 if(BUILD_WEB)
-  set(DILIGENT_NO_OPENGL     OFF CACHE BOOL "" FORCE)
+  set(DILIGENT_NO_OPENGL     ON  CACHE BOOL "" FORCE)
 else()
   set(DILIGENT_NO_OPENGL     ON  CACHE BOOL "" FORCE)
 endif()
 set(DILIGENT_NO_VULKAN       ON  CACHE BOOL "" FORCE)
 set(DILIGENT_NO_DIRECT3D11   ON  CACHE BOOL "" FORCE)
-set(DILIGENT_NO_WEBGPU       ON  CACHE BOOL "" FORCE)
+if(BUILD_WEB)
+  set(DILIGENT_NO_WEBGPU     OFF CACHE BOOL "" FORCE)
+else()
+  set(DILIGENT_NO_WEBGPU     ON  CACHE BOOL "" FORCE)
+endif()
 if(NOT BUILD_WEB)
   set(DILIGENT_NO_DIRECT3D12 OFF CACHE BOOL "" FORCE)   # enable D3D12 on desktop
 endif()
