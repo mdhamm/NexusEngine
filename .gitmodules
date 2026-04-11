@@ -1,3 +1,9 @@
 [submodule "extern/flecs"]
 	path = extern/flecs
 	url = https://github.com/SanderMertens/flecs
+[submodule "extern/DiligentEngine"]
+	path = extern/DiligentEngine
+	url = https://github.com/DiligentGraphics/DiligentEngine
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = https://github.com/ocornut/imgui
