@@ -7,22 +7,28 @@
 
 namespace NexusEngine
 {
-    // Mesh contains only raw geometry data (not an ECS component itself)
+    // Raw mesh geometry resource shared by renderable entities.
     struct Mesh
     {
-        // Geometry buffers
+        // Vertex buffer containing mesh vertices.
         Diligent::RefCntAutoPtr<Diligent::IBuffer> vertexBuffer;
+
+        // Index buffer containing mesh indices.
         Diligent::RefCntAutoPtr<Diligent::IBuffer> indexBuffer;
 
-        // Geometry metadata
+        // Number of vertices in the mesh.
         Diligent::Uint32 vertexCount = 0;
+
+        // Number of indices in the mesh.
         Diligent::Uint32 indexCount = 0;
+
+        // Size of a single vertex in bytes.
         Diligent::Uint32 vertexStride = 0;
 
-        // Topology
+        // Primitive topology used when drawing the mesh.
         Diligent::PRIMITIVE_TOPOLOGY topology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-        // Mesh identifier
+        // Debug or asset name for the mesh.
         std::string name;
     };
 } // namespace NexusEngine

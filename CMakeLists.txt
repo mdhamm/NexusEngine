@@ -53,6 +53,35 @@ set(DILIGENT_BUILD_TESTS     OFF CACHE BOOL "" FORCE)
 # Bring in Diligent sources (expects extern/DiligentEngine in your tree)
 add_subdirectory(extern/DiligentEngine)
 
+#if(BUILD_WEB)
+#  function(nexus_apply_webgpu_tint_workarounds dir)
+#    get_property(targets DIRECTORY "${dir}" PROPERTY BUILDSYSTEM_TARGETS)
+#    foreach(t IN LISTS targets)
+#      if(t MATCHES "^(tint_|absl_)")
+#        get_target_property(target_type ${t} TYPE)
+#        if(target_type STREQUAL "INTERFACE_LIBRARY")
+#          target_compile_options(${t} INTERFACE
+#            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-c2y-extensions>"
+#            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-pragma>"
+#          )
+#        else()
+#          target_compile_options(${t} PRIVATE
+#            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-c2y-extensions>"
+#            "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-pragma>"
+#          )
+#        endif()
+#      endif()
+#    endforeach()
+#
+#    get_property(subdirs DIRECTORY "${dir}" PROPERTY SUBDIRECTORIES)
+#    foreach(subdir IN LISTS subdirs)
+#      nexus_apply_webgpu_tint_workarounds("${subdir}")
+#    endforeach()
+#  endfunction()
+#
+#  nexus_apply_webgpu_tint_workarounds("${CMAKE_CURRENT_SOURCE_DIR}/extern/DiligentEngine")
+#endif()
+
 # ---- Flecs (ECS) ----
 # Flecs config (static lib, no tests/docs/tools)
 set(FLECS_STATIC   ON  CACHE BOOL "" FORCE)
@@ -85,8 +114,8 @@ if(BUILD_WEB)
 endif()
 
 # ---- ImGui (docking) ----
-add_subdirectory(extern/imgui) 
-set_target_properties(imgui PROPERTIES FOLDER "extern")
+#add_subdirectory(extern/imgui) 
+#set_target_properties(imgui PROPERTIES FOLDER "extern")
 
 # ---------------- SDL2 (shared iface for apps) ----------------
 if(NOT BUILD_WEB)

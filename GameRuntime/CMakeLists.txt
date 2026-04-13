@@ -22,6 +22,7 @@ if(BUILD_WEB)
     "-sUSE_SDL=2"
     "-sASSERTIONS=1"
     "-sUSE_WEBGPU=1"
+    "-sASYNCIFY"
     "--preload-file=${CMAKE_SOURCE_DIR}/NexusEngine/shaders@/NexusEngine/shaders"
     "-sSTACK_SIZE=524288"
     "-sALLOW_MEMORY_GROWTH"

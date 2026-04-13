@@ -11,36 +11,49 @@
 
 namespace NexusEngine
 {
+    // Material description containing shaders, state, and shared bindings.
     struct Material
     {
-        // Shaders
+        // Vertex shader used by the material.
         Diligent::RefCntAutoPtr<Diligent::IShader> vertexShader;
+
+        // Pixel shader used by the material.
         Diligent::RefCntAutoPtr<Diligent::IShader> pixelShader;
         
-        // Pipeline state
+        // Pipeline state object used for rendering.
         Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipelineState;
         
-        // Shader resource binding template (can be cloned per mesh instance)
+        // Shared shader resource binding template for per-instance clones.
         Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderResourceBindingTemplate;
         
-        // Textures
+        // Base color texture view.
         Diligent::RefCntAutoPtr<Diligent::ITextureView> albedoTexture;
+
+        // Normal map texture view.
         Diligent::RefCntAutoPtr<Diligent::ITextureView> normalTexture;
+
+        // Metallic-roughness texture view.
         Diligent::RefCntAutoPtr<Diligent::ITextureView> metallicRoughnessTexture;
         
-        // Uniform buffers
+        // Constant buffer holding material parameters.
         Diligent::RefCntAutoPtr<Diligent::IBuffer> materialConstantBuffer;
 
-        // Pipeline inputs used to build cached pipeline variants on demand
+        // Input layout used to build compatible pipeline variants.
         std::vector<Diligent::LayoutElement> m_inputLayout;
         
-        // Material properties
+        // Debug or asset name for the material.
         std::string name;
+
+        // Enables alpha blending style rendering paths.
         bool isTransparent = false;
         
-        // Render state
+        // Face culling mode.
         Diligent::CULL_MODE cullMode = Diligent::CULL_MODE_NONE;
+
+        // Enables depth testing.
         bool depthTestEnabled = true;
+
+        // Enables depth writes.
         bool depthWriteEnabled = true;
     };
 } // namespace NexusEngine

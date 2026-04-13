@@ -8,26 +8,31 @@ namespace NexusEngine
     struct Mesh;
     struct Material;
 
-    // RenderMeshComponent combines geometry (Mesh) with material for rendering
-    // This IS an actual ECS component that gets attached to entities
+    // ECS component that binds a mesh and material to an entity for rendering.
     struct RenderMeshComponent
     {
-        // Reference to mesh geometry (can be shared across multiple entities)
+        // Shared mesh geometry used by this entity.
         Mesh* mesh = nullptr;
 
-        // Reference to material (can be shared across multiple entities)
+        // Shared material used to render the mesh.
         Material* material = nullptr;
 
-        // Per-instance shader resource binding (if needed for per-object uniforms)
+        // Optional per-instance shader resource binding.
         Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> instanceSRB;
 
-        // Per-instance constant buffer (for transforms, etc.)
+        // Optional per-instance constant buffer.
         Diligent::RefCntAutoPtr<Diligent::IBuffer> instanceConstantBuffer;
 
-        // Rendering flags
+        // Enables or disables rendering for this component.
         bool visible = true;
+
+        // Enables shadow casting for this mesh.
         bool castShadows = true;
+
+        // Enables receiving shadows for this mesh.
         bool receiveShadows = true;
+
+        // Render layer used for filtering and ordering.
         int renderLayer = 0; // For sorting/filtering
     };
 } // namespace NexusEngine

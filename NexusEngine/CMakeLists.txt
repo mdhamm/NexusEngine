@@ -15,7 +15,6 @@ target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/components
   ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine
-  ${CMAKE_SOURCE_DIR}/extern/imgui
 )
 
 target_compile_definitions(NexusEngine
@@ -50,24 +49,13 @@ else()
   message(FATAL_ERROR "Flecs target not found.")
 endif()
 
-# ---- ImGui: add backends here, link vendored 'imgui' core ----
-target_sources(NexusEngine PRIVATE
-  ${CMAKE_SOURCE_DIR}/extern/imgui/backends/imgui_impl_sdl2.cpp
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentTools/Imgui/src/ImGuiDiligentRenderer.cpp
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentTools/Imgui/src/ImGuiImplDiligent.cpp
-)
-
 target_include_directories(NexusEngine PRIVATE
-  ${CMAKE_SOURCE_DIR}/extern/imgui/backends
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Common/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsEngine/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsTools/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsAccessories/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Platforms/Basic/interface
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentTools/Imgui/interface
 )
-
-target_link_libraries(NexusEngine PRIVATE imgui)
 
 if(BUILD_WEB)
   target_link_libraries(NexusEngine PRIVATE DILIGENT_WEBGPU)

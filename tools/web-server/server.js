@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const zlib = require('zlib');
 
 const rootDir = path.resolve(process.argv[2] || path.join(__dirname, '..', '..', 'out', 'build', 'web-release', 'GameRuntime'));
 const port = Number.parseInt(process.argv[3] || '8000', 10);
@@ -19,12 +20,39 @@ const mimeTypes = {
     '.wasm': 'application/wasm'
 };
 
+const compressibleExtensions = new Set([
+    '.css',
+    '.data',
+    '.html',
+    '.js',
+    '.json',
+    '.map',
+    '.svg',
+    '.txt',
+    '.wasm'
+]);
+
 function setCommonHeaders(response)
 {
     response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    response.setHeader('Vary', 'Accept-Encoding');
+}
+
+function getContentEncoding(request, extension)
+{
+    if (!compressibleExtensions.has(extension))
+        return null;
+
+    const acceptEncoding = request.headers['accept-encoding'] || '';
+    if (acceptEncoding.includes('br'))
+        return 'br';
+    if (acceptEncoding.includes('gzip'))
+        return 'gzip';
+
+    return null;
 }
 
 function tryGetDefaultFile(directory)
@@ -78,8 +106,24 @@ const server = http.createServer((request, response) =>
 
     const extension = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[extension] || 'application/octet-stream';
-    response.writeHead(200, { 'Content-Type': contentType });
-    fs.createReadStream(filePath).pipe(response);
+    const contentEncoding = getContentEncoding(request, extension);
+
+    response.statusCode = 200;
+    response.setHeader('Content-Type', contentType);
+
+    let stream = fs.createReadStream(filePath);
+    if (contentEncoding === 'br')
+    {
+        response.setHeader('Content-Encoding', 'br');
+        stream = stream.pipe(zlib.createBrotliCompress());
+    }
+    else if (contentEncoding === 'gzip')
+    {
+        response.setHeader('Content-Encoding', 'gzip');
+        stream = stream.pipe(zlib.createGzip());
+    }
+
+    stream.pipe(response);
 });
 
 server.listen(port, () =>

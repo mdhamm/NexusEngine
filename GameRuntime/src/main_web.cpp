@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <emscripten/emscripten.h>
 
+#include <cstdio>
 #include <memory>
 
 #include <NexusEngine.h>
@@ -24,7 +25,10 @@ static void main_loop()
 int main()
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init failed: %s", SDL_GetError());
         return 1;
+    }
 
     g_window = SDL_CreateWindow(
         "GameRuntime (Web)",
@@ -32,11 +36,18 @@ int main()
         1280, 720,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
     );
-    if (!g_window) return 1;
+    if (!g_window)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow failed: %s", SDL_GetError());
+        return 1;
+    }
 
     std::unique_ptr<NexusEngine::IGameApp> game = SampleGame::CreateGame();
     if (!game)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SampleGame::CreateGame returned null");
         return 1;
+    }
 
     NexusEngine::NativeWindow nw{};
     nw.m_width = 1280;
@@ -44,7 +55,10 @@ int main()
     nw.m_canvasId = "#canvas";
 
     if (!g_engine.Initialize(nw, std::move(game)))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Engine initialization failed");
         return 1;
+    }
 
     g_prev_ms = emscripten_get_now();
     emscripten_set_main_loop(main_loop, 0, 1);

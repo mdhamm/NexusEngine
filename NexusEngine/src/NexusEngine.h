@@ -25,50 +25,90 @@ namespace NexusEngine
 {
     class Engine;
 
+    // Game-facing interface implemented by runtime or sample code.
     class IGameApp
     {
     public:
         virtual ~IGameApp() = default;
 
         /// <summary>
-        /// Called once at the start of the game. Use this to set up scenes, entities, etc.
+        /// Called once during engine startup to create scenes and game state.
         /// </summary>
-        /// <param name="engine">Reference to the engine, for scene management and other operations</param>
-        /// <returns>True if initialization succeeded and the game can start; false to abort.</returns>
+        /// <param name="engine">Engine instance used to create and configure game state.</param>
         virtual void OnStartup(Engine& engine) { REF(engine); };
+
+        /// <summary>
+        /// Called during shutdown before engine resources are released.
+        /// </summary>
+        /// <param name="engine">Engine instance being shut down.</param>
         virtual void OnShutdown(Engine& engine) { REF(engine); };
     };
 
+    // Main engine entry point that owns rendering and scene lifetime.
     class Engine
     {
     public:
         /// <summary>
-        /// Initializes the game engine. This must be called before starting the game loop.
+        /// Initializes the engine against a native window and game instance.
         /// </summary>
-        /// <param name="win">Abstracted info about the native window</param>
-        /// <returns></returns>
+        /// <param name="win">Native window description used for renderer startup.</param>
+        /// <param name="game">Game implementation owned by the engine.</param>
+        /// <returns>True if initialization succeeds; otherwise false.</returns>
         bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game);
 
         /// <summary>
-        /// Cleans up resources used by the engine.
+        /// Releases engine-owned resources and shuts the game down.
         /// </summary>
         void Shutdown();
 
         /// <summary>
-        /// Starts game loop. This is a blocking call that will run until the process is terminated.
+        /// Runs the main blocking game loop.
         /// </summary>
         void Start();
+
+        /// <summary>
+        /// Advances the engine by a single frame.
+        /// </summary>
+        /// <param name="dt">Frame delta time in seconds.</param>
         void RunFrame(float dt);
 
-        // Scene management
+        /// <summary>
+        /// Creates and stores a named scene.
+        /// </summary>
+        /// <param name="name">Name assigned to the new scene.</param>
+        /// <returns>A reference to the created scene.</returns>
         Scene& CreateScene(const std::string& name);
+
+        /// <summary>
+        /// Removes a scene by name.
+        /// </summary>
+        /// <param name="name">Name of the scene to remove.</param>
         void RemoveScene(const std::string& name);
+
+        /// <summary>
+        /// Finds a scene by name.
+        /// </summary>
+        /// <param name="name">Name of the scene to locate.</param>
+        /// <returns>A pointer to the scene if found; otherwise null.</returns>
         Scene* FindScene(const std::string& name);
+
+        /// <summary>
+        /// Returns the currently active scene.
+        /// </summary>
+        /// <returns>The active scene, or null if none is active.</returns>
         Scene* ActiveScene() { return m_activeScene; }
+
+        /// <summary>
+        /// Sets the active scene by name.
+        /// </summary>
+        /// <param name="name">Name of the scene to activate.</param>
         void SetActiveScene(const std::string& name);
 
-        // ImGui system
-       /* bool EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport);
+        /// <summary>
+        /// Forwards SDL events to engine systems that need them.
+        /// </summary>
+        /// <param name="e">SDL event to process.</param>
+        /* bool EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport);
         void DisableImGui();*/
         void ProcessSDLEvent(const SDL_Event& e);
 
@@ -78,18 +118,36 @@ namespace NexusEngine
         //void RenderUi(Diligent::IDeviceContext* ctx);
 
     private:
+        // Tracks whether initialization completed successfully.
         bool m_initialized = false;
+
+        // Tracks whether the blocking main loop has started.
         bool m_started = false;
+
+        // Tracks whether shutdown has already been requested.
         bool m_shutdown = false;
+
+        // Non-owning pointer to the active game implementation.
         IGameApp* m_game = nullptr;
+
+        // Rendering backend used by the engine.
         GraphicsRenderer m_graphicsRenderer;
+
+        // Owned scenes managed by the engine.
         std::vector<std::unique_ptr<Scene>> m_scenes;
+
+        // Currently active scene.
         Scene* m_activeScene = nullptr;
 
         struct UiState
         {
+            // Indicates whether UI rendering is active.
             bool enabled = false;
+
+            // SDL window used by the UI backend.
             SDL_Window* sdlWindow = nullptr;
+
+            // Diligent-backed ImGui renderer instance.
             Diligent::ImGuiImplDiligent* imguiDiligent = nullptr;
         } m_ui;
     };

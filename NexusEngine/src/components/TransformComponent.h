@@ -8,18 +8,35 @@
 
 namespace NexusEngine
 {
+    // Minimal quaternion helper used by transform code.
     struct Quaternion
     {
+        // X component of the quaternion vector part.
         float x = 0.0f;
+
+        // Y component of the quaternion vector part.
         float y = 0.0f;
+
+        // Z component of the quaternion vector part.
         float z = 0.0f;
+
+        // W component of the quaternion scalar part.
         float w = 1.0f;
 
+        /// <summary>
+        /// Returns the identity rotation.
+        /// </summary>
+        /// <returns>An identity quaternion.</returns>
         static Quaternion Identity()
         {
             return Quaternion{};
         }
 
+        /// <summary>
+        /// Returns a normalized quaternion.
+        /// </summary>
+        /// <param name="q">Quaternion to normalize.</param>
+        /// <returns>The normalized quaternion.</returns>
         static Quaternion Normalize(const Quaternion& q)
         {
             const float lenSq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
@@ -38,6 +55,11 @@ namespace NexusEngine
             return result;
         }
 
+        /// <summary>
+        /// Returns the quaternion conjugate.
+        /// </summary>
+        /// <param name="q">Quaternion to conjugate.</param>
+        /// <returns>The conjugated quaternion.</returns>
         static Quaternion Conjugate(const Quaternion& q)
         {
             Quaternion result;
@@ -48,6 +70,12 @@ namespace NexusEngine
             return result;
         }
 
+        /// <summary>
+        /// Multiplies two quaternions.
+        /// </summary>
+        /// <param name="a">Left-hand quaternion.</param>
+        /// <param name="b">Right-hand quaternion.</param>
+        /// <returns>The multiplied quaternion.</returns>
         static Quaternion Multiply(const Quaternion& a, const Quaternion& b)
         {
             Quaternion result;
@@ -58,6 +86,12 @@ namespace NexusEngine
             return result;
         }
 
+        /// <summary>
+        /// Builds a quaternion from an axis-angle rotation.
+        /// </summary>
+        /// <param name="axis">Rotation axis.</param>
+        /// <param name="angleRadians">Rotation angle in radians.</param>
+        /// <returns>The resulting quaternion.</returns>
         static Quaternion FromAxisAngle(const Diligent::float3& axis, float angleRadians)
         {
             const float halfAngle = angleRadians * 0.5f;
@@ -71,6 +105,13 @@ namespace NexusEngine
             return Normalize(result);
         }
 
+        /// <summary>
+        /// Builds a quaternion from Euler angles in radians.
+        /// </summary>
+        /// <param name="pitchRadians">Pitch rotation in radians.</param>
+        /// <param name="yawRadians">Yaw rotation in radians.</param>
+        /// <param name="rollRadians">Roll rotation in radians.</param>
+        /// <returns>The resulting quaternion.</returns>
         static Quaternion FromEuler(float pitchRadians, float yawRadians, float rollRadians)
         {
             const Quaternion qx = FromAxisAngle(Diligent::float3(1.0f, 0.0f, 0.0f), pitchRadians);
@@ -80,11 +121,21 @@ namespace NexusEngine
             return Multiply(Multiply(qx, qy), qz);
         }
 
+        /// <summary>
+        /// Builds a quaternion from an Euler vector in radians.
+        /// </summary>
+        /// <param name="eulerRadians">Euler rotation vector in radians.</param>
+        /// <returns>The resulting quaternion.</returns>
         static Quaternion FromEuler(const Diligent::float3& eulerRadians)
         {
             return FromEuler(eulerRadians.x, eulerRadians.y, eulerRadians.z);
         }
 
+        /// <summary>
+        /// Converts a quaternion to Euler angles in radians.
+        /// </summary>
+        /// <param name="q">Quaternion to convert.</param>
+        /// <returns>Euler rotation in radians.</returns>
         static Diligent::float3 ToEuler(const Quaternion& q)
         {
             const Quaternion n = Normalize(q);
@@ -141,6 +192,12 @@ namespace NexusEngine
             return euler;
         }
 
+        /// <summary>
+        /// Rotates a vector by a quaternion.
+        /// </summary>
+        /// <param name="q">Rotation quaternion.</param>
+        /// <param name="v">Vector to rotate.</param>
+        /// <returns>The rotated vector.</returns>
         static Diligent::float3 Rotate(const Quaternion& q, const Diligent::float3& v)
         {
             const Quaternion nq = Normalize(q);
@@ -150,20 +207,34 @@ namespace NexusEngine
             return Diligent::float3(rq.x, rq.y, rq.z);
         }
 
+        /// <summary>
+        /// Returns the forward direction for a rotation.
+        /// </summary>
+        /// <param name="q">Rotation quaternion.</param>
+        /// <returns>The forward direction vector.</returns>
         static Diligent::float3 Foward(const Quaternion& q)
         {
             return Rotate(q, Diligent::float3(0.0f, 0.0f, -1.0f));
         }
 
+        /// <summary>
+        /// Returns the right direction for a rotation.
+        /// </summary>
+        /// <param name="q">Rotation quaternion.</param>
+        /// <returns>The right direction vector.</returns>
         static Diligent::float3 Right(const Quaternion& q)
         {
             return Rotate(q, Diligent::float3(1.0f, 0.0f, 0.0f));
         }
     };
 
+    // Transform component storing local and derived world transforms.
     struct TransformComponent
     {
     public:
+        /// <summary>
+        /// Creates an identity transform.
+        /// </summary>
         TransformComponent()
         {
             RebuildLocalMatrixFromLocalTRS();
@@ -175,6 +246,13 @@ namespace NexusEngine
             RebuildWorldMatrixFromWorldTRS();
         }
 
+        /// <summary>
+        /// Creates a transform from local-space values.
+        /// </summary>
+        /// <param name="localPosition">Local-space position.</param>
+        /// <param name="localRotation">Local-space rotation.</param>
+        /// <param name="localScale">Local-space scale.</param>
+        /// <returns>A transform initialized from local values.</returns>
         static TransformComponent FromLocal(
             const Diligent::float3& localPosition,
             const Quaternion& localRotation = Quaternion::Identity(),
@@ -195,6 +273,13 @@ namespace NexusEngine
             return transform;
         }
 
+        /// <summary>
+        /// Creates a transform from world-space values.
+        /// </summary>
+        /// <param name="worldPosition">World-space position.</param>
+        /// <param name="worldRotation">World-space rotation.</param>
+        /// <param name="worldScale">World-space scale.</param>
+        /// <returns>A transform initialized from world values.</returns>
         static TransformComponent FromWorld(
             const Diligent::float3& worldPosition,
             const Quaternion& worldRotation = Quaternion::Identity(),
@@ -215,41 +300,73 @@ namespace NexusEngine
             return transform;
         }
 
+        /// <summary>
+        /// Returns the local position.
+        /// </summary>
+        /// <returns>The local position.</returns>
         const Diligent::float3& GetLocalPosition() const
         {
             return m_localPosition;
         }
 
+        /// <summary>
+        /// Returns the local rotation.
+        /// </summary>
+        /// <returns>The local rotation.</returns>
         const Quaternion& GetLocalRotation() const
         {
             return m_localRotation;
         }
 
+        /// <summary>
+        /// Returns the local scale.
+        /// </summary>
+        /// <returns>The local scale.</returns>
         const Diligent::float3& GetLocalScale() const
         {
             return m_localScale;
         }
 
+        /// <summary>
+        /// Returns the derived world position.
+        /// </summary>
+        /// <returns>The world position.</returns>
         const Diligent::float3& GetWorldPosition() const
         {
             return m_worldPosition;
         }
 
+        /// <summary>
+        /// Returns the derived world rotation.
+        /// </summary>
+        /// <returns>The world rotation.</returns>
         const Quaternion& GetWorldRotation() const
         {
             return m_worldRotation;
         }
 
+        /// <summary>
+        /// Returns the derived world scale.
+        /// </summary>
+        /// <returns>The world scale.</returns>
         const Diligent::float3& GetWorldScale() const
         {
             return m_worldScale;
         }
 
+        /// <summary>
+        /// Returns the local transform matrix.
+        /// </summary>
+        /// <returns>The local transform matrix.</returns>
         const Diligent::float4x4& GetLocalMatrix() const
         {
             return m_localMatrix;
         }
 
+        /// <summary>
+        /// Returns the world transform matrix.
+        /// </summary>
+        /// <returns>The world transform matrix.</returns>
         const Diligent::float4x4& GetWorldMatrix() const
         {
             return m_worldMatrix;
@@ -451,11 +568,21 @@ namespace NexusEngine
         Diligent::float4x4 m_worldMatrix = Diligent::float4x4::Identity();
     };
 
+    /// <summary>
+    /// Returns the transform parent for an entity.
+    /// </summary>
+    /// <param name="entity">Entity to inspect.</param>
+    /// <returns>The parent entity handle.</returns>
     inline flecs::entity GetTransformParent(const flecs::entity& entity)
     {
         return entity.parent();
     }
 
+    /// <summary>
+    /// Returns a mutable transform and asserts that one exists.
+    /// </summary>
+    /// <param name="entity">Entity that owns the transform.</param>
+    /// <returns>A mutable transform reference.</returns>
     inline TransformComponent& RequireTransform(const flecs::entity& entity)
     {
         TransformComponent* transform = entity.get_mut<TransformComponent>();
@@ -463,6 +590,10 @@ namespace NexusEngine
         return *transform;
     }
 
+    /// <summary>
+    /// Recomputes world-space values from local-space values.
+    /// </summary>
+    /// <param name="entity">Entity whose transform should be updated.</param>
     inline void UpdateWorldFromLocal(const flecs::entity& entity)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -500,6 +631,10 @@ namespace NexusEngine
         }
     }
 
+    /// <summary>
+    /// Recomputes local-space values from world-space values.
+    /// </summary>
+    /// <param name="entity">Entity whose transform should be updated.</param>
     inline void UpdateLocalFromWorld(const flecs::entity& entity)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -539,6 +674,10 @@ namespace NexusEngine
         transform.RebuildLocalMatrixFromLocalTRS();
     }
 
+    /// <summary>
+    /// Updates world transforms for an entity and its descendants.
+    /// </summary>
+    /// <param name="entity">Root entity to update.</param>
     inline void UpdateWorldRecursive(const flecs::entity& entity)
     {
         UpdateWorldFromLocal(entity);
@@ -553,6 +692,10 @@ namespace NexusEngine
             });
     }
 
+    /// <summary>
+    /// Updates only the descendants of an entity.
+    /// </summary>
+    /// <param name="entity">Parent entity whose children should be updated.</param>
     inline void UpdateChildrenRecursive(const flecs::entity& entity)
     {
         entity.children(
@@ -565,6 +708,13 @@ namespace NexusEngine
             });
     }
 
+    /// <summary>
+    /// Sets the full local transform and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="localPosition">New local position.</param>
+    /// <param name="localRotation">New local rotation.</param>
+    /// <param name="localScale">New local scale.</param>
     inline void SetLocalTransform(
         const flecs::entity& entity,
         const Diligent::float3& localPosition,
@@ -580,6 +730,11 @@ namespace NexusEngine
         UpdateWorldRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets local position and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="localPosition">New local position.</param>
     inline void SetLocalPosition(const flecs::entity& entity, const Diligent::float3& localPosition)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -587,6 +742,11 @@ namespace NexusEngine
         UpdateWorldRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets local rotation and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="localRotation">New local rotation.</param>
     inline void SetLocalRotation(const flecs::entity& entity, const Quaternion& localRotation)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -594,6 +754,11 @@ namespace NexusEngine
         UpdateWorldRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets local scale and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="localScale">New local scale.</param>
     inline void SetLocalScale(const flecs::entity& entity, const Diligent::float3& localScale)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -601,6 +766,13 @@ namespace NexusEngine
         UpdateWorldRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets the full world transform and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="worldPosition">New world position.</param>
+    /// <param name="worldRotation">New world rotation.</param>
+    /// <param name="worldScale">New world scale.</param>
     inline void SetWorldTransform(
         const flecs::entity& entity,
         const Diligent::float3& worldPosition,
@@ -617,6 +789,11 @@ namespace NexusEngine
         UpdateChildrenRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets world position and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="worldPosition">New world position.</param>
     inline void SetWorldPosition(const flecs::entity& entity, const Diligent::float3& worldPosition)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -625,6 +802,11 @@ namespace NexusEngine
         UpdateChildrenRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets world rotation and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="worldRotation">New world rotation.</param>
     inline void SetWorldRotation(const flecs::entity& entity, const Quaternion& worldRotation)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -633,6 +815,11 @@ namespace NexusEngine
         UpdateChildrenRecursive(entity);
     }
 
+    /// <summary>
+    /// Sets world scale and updates the hierarchy.
+    /// </summary>
+    /// <param name="entity">Entity to update.</param>
+    /// <param name="worldScale">New world scale.</param>
     inline void SetWorldScale(const flecs::entity& entity, const Diligent::float3& worldScale)
     {
         TransformComponent& transform = RequireTransform(entity);
@@ -641,6 +828,10 @@ namespace NexusEngine
         UpdateChildrenRecursive(entity);
     }
 
+    /// <summary>
+    /// Rebuilds transform state for all root entities in a world.
+    /// </summary>
+    /// <param name="world">World whose transform hierarchy should be synchronized.</param>
     inline void SyncTransformHierarchyFromRoots(flecs::world& world)
     {
         world.each<TransformComponent>(
