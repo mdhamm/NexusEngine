@@ -7,6 +7,7 @@
 #include "rendering/RenderResourceFactory.h"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>
+#include <DiligentCore/Graphics/GraphicsEngine/interface/BufferView.h>
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 
@@ -258,6 +259,7 @@ namespace NexusEngine
 
                                 if (material->materialConstantBuffer)
                                 {
+                                    // Matrices in HLSL default to column-major, transpose for row-major mul(v,m)
                                     const Diligent::float4x4 viewProjMatrixT = viewProjMatrix.Transpose();
                                     MapHelper<Diligent::float4x4> mappedData(
                                         ctx,
@@ -272,16 +274,27 @@ namespace NexusEngine
                                     m_instanceTransformBuffer,
                                     MAP_WRITE,
                                     MAP_FLAG_DISCARD);
-                                std::memcpy(mappedInstances, instanceData, sizeof(InstanceTransformData) * instanceCount);
+
+                                // StructuredBuffer matrices also need transpose for row-major mul(v,m)
+                                for (Uint32 i = 0; i < instanceCount; ++i)
+                                {
+                                    mappedInstances[i].m_world = instanceData[i].m_world.Transpose();
+                                }
+
+                                // Bind the StructuredBuffer for instance data to the shader
+                                if (auto* instanceVar = srb->GetVariableByName(SHADER_TYPE_VERTEX, "g_InstanceData"))
+                                {
+                                    instanceVar->Set(m_instanceTransformBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+                                }
 
                                 ctx->SetPipelineState(cachedPipeline->m_pipelineState);
                                 ctx->CommitShaderResources(srb, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-                                IBuffer* vertexBuffers[] = { mesh->vertexBuffer, m_instanceTransformBuffer };
-                                Uint64 offsets[] = { 0, 0 };
+                                IBuffer* vertexBuffers[] = { mesh->vertexBuffer };
+                                Uint64 offsets[] = { 0 };
                                 ctx->SetVertexBuffers(
                                     0,
-                                    2,
+                                    1,
                                     vertexBuffers,
                                     offsets,
                                     RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
@@ -371,9 +384,11 @@ namespace NexusEngine
         BufferDesc bufferDesc;
         bufferDesc.Name = "Scene.InstanceTransforms";
         bufferDesc.Usage = USAGE_DYNAMIC;
-        bufferDesc.BindFlags = BIND_VERTEX_BUFFER;
+        bufferDesc.BindFlags = BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
         bufferDesc.Size = sizeof(InstanceTransformData) * newCapacity;
+        bufferDesc.Mode = BUFFER_MODE_STRUCTURED;
+        bufferDesc.ElementByteStride = sizeof(InstanceTransformData);
 
         Diligent::RefCntAutoPtr<Diligent::IBuffer> buffer;
         device->CreateBuffer(bufferDesc, nullptr, &buffer);

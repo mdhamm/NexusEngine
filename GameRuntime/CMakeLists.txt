@@ -17,15 +17,26 @@ add_executable(GameRuntime ${GAME_MAIN})
 target_link_libraries(GameRuntime PRIVATE SampleGame NEXUS_SDL)
 
 if(BUILD_WEB)
-  set_target_properties(GameRuntime PROPERTIES SUFFIX ".html")
+  # Configure the HTML template with CMake (like Diligent does)
+  # Emscripten outputs .js by default, our HTML loads that JS
+  set(TARGET_NAME "GameRuntime")
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/shell.html.in
+    ${CMAKE_CURRENT_BINARY_DIR}/GameRuntime.html
+    @ONLY
+  )
   target_link_options(GameRuntime PRIVATE
     "-sUSE_SDL=2"
     "-sASSERTIONS=1"
     "-sUSE_WEBGPU=1"
-    "-sASYNCIFY"
+    "-sUSE_PTHREADS=1"
+    "-sPTHREAD_POOL_SIZE=4"
+    "-sWASM_BIGINT"
+    "-sWASM=1"
     "--preload-file=${CMAKE_SOURCE_DIR}/NexusEngine/shaders@/NexusEngine/shaders"
     "-sSTACK_SIZE=524288"
     "-sALLOW_MEMORY_GROWTH"
+    "-sINITIAL_MEMORY=67108864"
   )
 else()
   target_link_libraries(GameRuntime PRIVATE DILIGENT_D3D12 NEXUS_SDL SampleGame)

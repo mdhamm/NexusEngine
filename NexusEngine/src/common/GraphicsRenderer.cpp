@@ -13,6 +13,7 @@
 #include <DiligentCore/Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h>
 #include <DiligentCore/Platforms/Win32/interface/Win32NativeWindow.h>
 #elif defined(__EMSCRIPTEN__)
+#include <emscripten/html5_webgpu.h>
 #include <DiligentCore/Graphics/GraphicsEngineWebGPU/interface/EngineFactoryWebGPU.h>
 #endif
 
@@ -87,7 +88,22 @@ namespace NexusEngine
 
         IDeviceContext* ppContexts[] = {nullptr};
 
-        factory->CreateDeviceAndContextsWebGPU(engCI, &device, ppContexts);
+        // Get the pre-initialized WebGPU device from Module.preinitializedWebGPUDevice
+        // This is set in shell.html.in before the WASM loads
+        WGPUDevice wgpuDevice = emscripten_webgpu_get_device();
+        if (!wgpuDevice)
+        {
+            return false;
+        }
+
+        WGPUInstance wgpuInstance = wgpuCreateInstance(nullptr);
+        if (!wgpuInstance)
+        {
+            return false;
+        }
+
+        // Attach to the existing WebGPU device instead of creating a new one
+        factory->AttachToWebGPUDevice(wgpuInstance, nullptr, wgpuDevice, engCI, &device, ppContexts);
         ctx = ppContexts[0];
         if (!device || !ctx)
         {

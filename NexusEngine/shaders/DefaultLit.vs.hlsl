@@ -3,15 +3,18 @@ cbuffer VSConstants
     float4x4 g_ViewProj;
 };
 
+struct InstanceData
+{
+    float4x4 World;
+};
+
+StructuredBuffer<InstanceData> g_InstanceData;
+
 struct VSInput
 {
-    float3 Pos            : ATTRIB0;
-    float3 Normal         : ATTRIB1;
-    float2 UV             : ATTRIB2;
-    float4 InstanceWorld0 : ATTRIB3;
-    float4 InstanceWorld1 : ATTRIB4;
-    float4 InstanceWorld2 : ATTRIB5;
-    float4 InstanceWorld3 : ATTRIB6;
+    float3 Pos    : ATTRIB0;
+    float3 Normal : ATTRIB1;
+    float2 UV     : ATTRIB2;
 };
 
 struct PSInput
@@ -22,17 +25,14 @@ struct PSInput
     float3 WorldPos : WORLD_POS;
 };
 
-void main(in VSInput VSIn, out PSInput PSIn)
+void main(in VSInput VSIn, in uint InstanceID : SV_InstanceID, out PSInput PSIn)
 {
-    const float4x4 world = float4x4(
-        VSIn.InstanceWorld0,
-        VSIn.InstanceWorld1,
-        VSIn.InstanceWorld2,
-        VSIn.InstanceWorld3);
-    const float4 worldPos = mul(float4(VSIn.Pos, 1.0), world);
+    float4x4 world = g_InstanceData[InstanceID].World;
+    float4 worldPos = mul(float4(VSIn.Pos, 1.0), world);
+    float3 worldNormal = mul(VSIn.Normal, (float3x3)world);
 
     PSIn.Pos = mul(worldPos, g_ViewProj);
-    PSIn.Normal = mul(float4(VSIn.Normal, 0.0), world).xyz;
+    PSIn.Normal = worldNormal;
     PSIn.UV = VSIn.UV;
     PSIn.WorldPos = worldPos.xyz;
 }

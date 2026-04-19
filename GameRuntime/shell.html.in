@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@TARGET_NAME@</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #canvas {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .loading {
+            color: white;
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.2);
+            border-left: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        #error { display: none; color: #ff6b6b; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" tabindex="1"></canvas>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div id="status">Initializing WebGPU...</div>
+        <div id="error"></div>
+    </div>
+
+    <script type='text/javascript'>
+        // Pre-initialize WebGPU device before WASM loads (matching Diligent's approach)
+        var initWebGPUDevice = (async () => {
+            console.log('[WebGPU] Starting initialization...');
+
+            if (!navigator.gpu) {
+                throw new Error('WebGPU is not supported in this browser');
+            }
+
+            console.log('[WebGPU] Requesting adapter...');
+            const adapter = await navigator.gpu.requestAdapter();
+
+            if (!adapter) {
+                throw new Error('Failed to get WebGPU adapter');
+            }
+            console.log('[WebGPU] Adapter obtained:', adapter);
+
+            // Request device with features the adapter supports (matching Diligent's feature list)
+            const requiredFeatures = [
+                'depth-clip-control',
+                'depth32float-stencil8',
+                'texture-compression-bc',
+                'indirect-first-instance',
+                'shader-f16',
+                'rg11b10ufloat-renderable',
+                'bgra8unorm-storage',
+                'float32-filterable',
+            ].filter(f => adapter.features.has(f));
+
+            console.log('[WebGPU] Requesting device with features:', requiredFeatures);
+            const device = await adapter.requestDevice({
+                requiredFeatures: requiredFeatures,
+                requiredLimits: {
+                    maxColorAttachmentBytesPerSample: adapter.limits.maxColorAttachmentBytesPerSample
+                }
+            });
+
+            if (!device) {
+                throw new Error('Failed to get WebGPU device');
+            }
+
+            console.log('[WebGPU] Device initialized successfully:', device);
+            return device;
+        })();
+
+        var Module = {
+            preRun: [],
+            postRun: [function() {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('canvas').style.display = 'block';
+                document.getElementById('canvas').focus();
+            }],
+            print: function(text) {
+                console.log(text);
+            },
+            printErr: function(text) {
+                console.error(text);
+            },
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                var dpr = window.devicePixelRatio || 1;
+                canvas.width = Math.ceil(dpr * window.innerWidth);
+                canvas.height = Math.ceil(dpr * window.innerHeight);
+                window.addEventListener('resize', function() {
+                    canvas.width = Math.ceil(dpr * window.innerWidth);
+                    canvas.height = Math.ceil(dpr * window.innerHeight);
+                });
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                var status = document.getElementById('status');
+                if (status) status.textContent = text || 'Loading...';
+            },
+            monitorRunDependencies: function(left) {
+                this.setStatus(left ? 'Loading... (' + left + ' remaining)' : 'Starting...');
+            }
+        };
+
+        // Initialize WebGPU, then load WASM
+        (async function() {
+            try {
+                document.getElementById('status').textContent = 'Initializing WebGPU...';
+                console.log('[Loader] Waiting for WebGPU device...');
+                const device = await initWebGPUDevice;
+
+                console.log('[Loader] Setting Module.preinitializedWebGPUDevice');
+                Module.preinitializedWebGPUDevice = device;
+                console.log('[Loader] Module.preinitializedWebGPUDevice set:', Module.preinitializedWebGPUDevice);
+
+                document.getElementById('status').textContent = 'Loading WASM...';
+                console.log('[Loader] Loading WASM script: @TARGET_NAME@.js');
+                const script = document.createElement('script');
+                script.src = '@TARGET_NAME@.js';
+                script.async = true;
+                script.onerror = function() {
+                    document.getElementById('error').textContent = 'Failed to load WASM module';
+                    document.getElementById('error').style.display = 'block';
+                    console.error('[Loader] Failed to load WASM script');
+                };
+                script.onload = function() {
+                    console.log('[Loader] WASM script loaded');
+                };
+                document.body.appendChild(script);
+            } catch (e) {
+                document.getElementById('error').textContent = 'Error: ' + e.message;
+                document.getElementById('error').style.display = 'block';
+                console.error('[Loader] WebGPU initialization failed:', e);
+            }
+        })();
+
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>

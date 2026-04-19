@@ -38,14 +38,11 @@ namespace NexusEngine
 
         std::vector<LayoutElement> CreateInstancedPosNormalUvLayout()
         {
+            // Only mesh vertex attributes - instance data now comes from StructuredBuffer
             return {
-                LayoutElement{0, 0, 3, VT_FLOAT32, False},
-                LayoutElement{1, 0, 3, VT_FLOAT32, False},
-                LayoutElement{2, 0, 2, VT_FLOAT32, False},
-                LayoutElement{3, 1, 4, VT_FLOAT32, False, 0,  sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-                LayoutElement{4, 1, 4, VT_FLOAT32, False, 16, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-                LayoutElement{5, 1, 4, VT_FLOAT32, False, 32, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-                LayoutElement{6, 1, 4, VT_FLOAT32, False, 48, sizeof(float4x4), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE}
+                LayoutElement{0, 0, 3, VT_FLOAT32, False},  // Position
+                LayoutElement{1, 0, 3, VT_FLOAT32, False},  // Normal
+                LayoutElement{2, 0, 2, VT_FLOAT32, False}   // UV
             };
         }
 
@@ -278,6 +275,8 @@ namespace NexusEngine
         shaderCI.Desc.UseCombinedTextureSamplers = true;
         shaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
         shaderCI.ShaderCompiler = SHADER_COMPILER_DEFAULT;
+        // Do NOT use SHADER_COMPILE_FLAG_PACK_MATRIX_ROW_MAJOR for WebGPU
+        // WGSL only supports column-major matrices (which is the default)
         m_device->CreateShader(shaderCI, &shader);
         return shader;
 #endif
