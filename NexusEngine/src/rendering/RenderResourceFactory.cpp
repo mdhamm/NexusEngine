@@ -458,8 +458,13 @@ namespace NexusEngine
 
             if (mat->materialConstantBuffer)
             {
-                MapHelper<float4x4> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
-                *mappedData = float4x4::Identity();
+                // Initialize with identity matrix columns
+                struct VSConstantsData { float4 col0, col1, col2, col3; };
+                MapHelper<VSConstantsData> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
+                mappedData->col0 = float4(1, 0, 0, 0);
+                mappedData->col1 = float4(0, 1, 0, 0);
+                mappedData->col2 = float4(0, 0, 1, 0);
+                mappedData->col3 = float4(0, 0, 0, 1);
             }
         }
 
@@ -476,7 +481,7 @@ namespace NexusEngine
             "Unlit.ps.hlsl",
             layout);
 
-        // Create constant buffer for VSConstants (one 4x4 matrix = 64 bytes)
+        // Create constant buffer for VSConstants (4 float4 columns = 64 bytes)
         if (mat)
         {
             mat->materialConstantBuffer = CreateConstantBuffer("VSConstants", 64);
@@ -484,8 +489,13 @@ namespace NexusEngine
             // IMPORTANT: Map buffer once to allocate GPU memory for dynamic buffers
             if (mat->materialConstantBuffer && m_context)
             {
-                MapHelper<float4x4> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
-                *mappedData = float4x4::Identity();
+                // Initialize with identity matrix columns
+                struct VSConstantsData { float4 col0, col1, col2, col3; };
+                MapHelper<VSConstantsData> mappedData(m_context, mat->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
+                mappedData->col0 = float4(1, 0, 0, 0);
+                mappedData->col1 = float4(0, 1, 0, 0);
+                mappedData->col2 = float4(0, 0, 1, 0);
+                mappedData->col3 = float4(0, 0, 0, 1);
             }
         }
 

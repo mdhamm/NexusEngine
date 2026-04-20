@@ -11,6 +11,10 @@
 #include <cstdio>
 #include <flecs.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/html5.h>
+#endif
+
 namespace SampleGame
 {
     namespace
@@ -227,6 +231,39 @@ namespace SampleGame
         {
             flecs::world& w = scene.m_world;
 
+#if defined(__EMSCRIPTEN__)
+            // Static variables for accumulated mouse movement on web
+            static int s_accumulatedMouseX = 0;
+            static int s_accumulatedMouseY = 0;
+            static bool s_pointerLockRequested = false;
+
+            // Set up mouse move callback for pointer lock mode
+            emscripten_set_mousemove_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, true,
+                [](int, const EmscriptenMouseEvent* e, void*) -> EM_BOOL {
+                    s_accumulatedMouseX += e->movementX;
+                    s_accumulatedMouseY += e->movementY;
+                    return EM_TRUE;
+                });
+
+            // Request pointer lock on click
+            emscripten_set_click_callback("#canvas", nullptr, true,
+                [](int, const EmscriptenMouseEvent*, void*) -> EM_BOOL {
+                    if (!s_pointerLockRequested)
+                    {
+                        emscripten_request_pointerlock("#canvas", true);
+                        s_pointerLockRequested = true;
+                    }
+                    return EM_TRUE;
+                });
+
+            // Track pointer lock state
+            emscripten_set_pointerlockchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, true,
+                [](int, const EmscriptenPointerlockChangeEvent* e, void*) -> EM_BOOL {
+                    s_pointerLockRequested = e->isActive;
+                    return EM_TRUE;
+                });
+#endif
+
             w.system<NexusEngine::TransformComponent, FlyCameraControllerComponent, NexusEngine::CameraComponent>("UpdateFlyCamera")
                 .kind(flecs::OnUpdate)
                 .iter(
@@ -236,7 +273,16 @@ namespace SampleGame
                         const Uint8* keyboardState = SDL_GetKeyboardState(nullptr);
                         int mouseDeltaX = 0;
                         int mouseDeltaY = 0;
+
+#if defined(__EMSCRIPTEN__)
+                        // Use accumulated mouse movement on web
+                        mouseDeltaX = s_accumulatedMouseX;
+                        mouseDeltaY = s_accumulatedMouseY;
+                        s_accumulatedMouseX = 0;
+                        s_accumulatedMouseY = 0;
+#else
                         SDL_GetRelativeMouseState(&mouseDeltaX, &mouseDeltaY);
+#endif
 
                         for (auto i : it)
                         {

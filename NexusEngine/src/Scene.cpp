@@ -20,9 +20,13 @@ namespace NexusEngine
 {
     namespace
     {
+        // Store matrix as 4 columns (float4 each) to avoid WGSL row-major matrix limitation
         struct InstanceTransformData
         {
-            Diligent::float4x4 m_world;
+            Diligent::float4 m_col0;
+            Diligent::float4 m_col1;
+            Diligent::float4 m_col2;
+            Diligent::float4 m_col3;
         };
 
         struct InstancingBatchKey
@@ -60,8 +64,18 @@ namespace NexusEngine
 
         InstanceTransformData CreateInstanceTransformData(const TransformComponent* transform)
         {
+            // Get the world matrix and extract columns for column-major storage
+            // The shader uses float4x4(col0, col1, col2, col3) which constructs column-major
+            // So we store the matrix columns directly
+            const Diligent::float4x4 world = transform ? transform->GetWorldMatrix() : Diligent::float4x4::Identity();
+
             InstanceTransformData instanceData{};
-            instanceData.m_world = transform ? transform->GetWorldMatrix() : Diligent::float4x4::Identity();
+            // Extract columns from the row-major Diligent matrix
+            // Column 0 = elements [0][0], [1][0], [2][0], [3][0]
+            instanceData.m_col0 = Diligent::float4(world.m[0][0], world.m[1][0], world.m[2][0], world.m[3][0]);
+            instanceData.m_col1 = Diligent::float4(world.m[0][1], world.m[1][1], world.m[2][1], world.m[3][1]);
+            instanceData.m_col2 = Diligent::float4(world.m[0][2], world.m[1][2], world.m[2][2], world.m[3][2]);
+            instanceData.m_col3 = Diligent::float4(world.m[0][3], world.m[1][3], world.m[2][3], world.m[3][3]);
             return instanceData;
         }
     }
@@ -259,14 +273,26 @@ namespace NexusEngine
 
                                 if (material->materialConstantBuffer)
                                 {
-                                    // Matrices in HLSL default to column-major, transpose for row-major mul(v,m)
-                                    const Diligent::float4x4 viewProjMatrixT = viewProjMatrix.Transpose();
-                                    MapHelper<Diligent::float4x4> mappedData(
+                                    // Store ViewProj as 4 columns to avoid WGSL row-major matrix issues
+                                    struct VSConstantsData
+                                    {
+                                        Diligent::float4 col0;
+                                        Diligent::float4 col1;
+                                        Diligent::float4 col2;
+                                        Diligent::float4 col3;
+                                    };
+
+                                    MapHelper<VSConstantsData> mappedData(
                                         ctx,
                                         material->materialConstantBuffer,
                                         MAP_WRITE,
                                         MAP_FLAG_DISCARD);
-                                    *mappedData = viewProjMatrixT;
+
+                                    // Extract columns from the row-major Diligent matrix
+                                    mappedData->col0 = Diligent::float4(viewProjMatrix.m[0][0], viewProjMatrix.m[1][0], viewProjMatrix.m[2][0], viewProjMatrix.m[3][0]);
+                                    mappedData->col1 = Diligent::float4(viewProjMatrix.m[0][1], viewProjMatrix.m[1][1], viewProjMatrix.m[2][1], viewProjMatrix.m[3][1]);
+                                    mappedData->col2 = Diligent::float4(viewProjMatrix.m[0][2], viewProjMatrix.m[1][2], viewProjMatrix.m[2][2], viewProjMatrix.m[3][2]);
+                                    mappedData->col3 = Diligent::float4(viewProjMatrix.m[0][3], viewProjMatrix.m[1][3], viewProjMatrix.m[2][3], viewProjMatrix.m[3][3]);
                                 }
 
                                 MapHelper<InstanceTransformData> mappedInstances(
@@ -275,11 +301,8 @@ namespace NexusEngine
                                     MAP_WRITE,
                                     MAP_FLAG_DISCARD);
 
-                                // StructuredBuffer matrices also need transpose for row-major mul(v,m)
-                                for (Uint32 i = 0; i < instanceCount; ++i)
-                                {
-                                    mappedInstances[i].m_world = instanceData[i].m_world.Transpose();
-                                }
+                                // Instance data is already in column format from CreateInstanceTransformData
+                                std::memcpy(mappedInstances, instanceData, sizeof(InstanceTransformData) * instanceCount);
 
                                 // Bind the StructuredBuffer for instance data to the shader
                                 if (auto* instanceVar = srb->GetVariableByName(SHADER_TYPE_VERTEX, "g_InstanceData"))

@@ -1,11 +1,17 @@
 cbuffer VSConstants
 {
-    float4x4 g_ViewProj;
+    float4 g_ViewProjCol0;
+    float4 g_ViewProjCol1;
+    float4 g_ViewProjCol2;
+    float4 g_ViewProjCol3;
 };
 
 struct InstanceData
 {
-    float4x4 World;
+    float4 Col0;
+    float4 Col1;
+    float4 Col2;
+    float4 Col3;
 };
 
 StructuredBuffer<InstanceData> g_InstanceData;
@@ -27,11 +33,13 @@ struct PSInput
 
 void main(in VSInput VSIn, in uint InstanceID : SV_InstanceID, out PSInput PSIn)
 {
-    float4x4 world = g_InstanceData[InstanceID].World;
-    float4 worldPos = mul(float4(VSIn.Pos, 1.0), world);
-    float3 worldNormal = mul(VSIn.Normal, (float3x3)world);
+    InstanceData inst = g_InstanceData[InstanceID];
+    float4x4 world = float4x4(inst.Col0, inst.Col1, inst.Col2, inst.Col3);
+    float4x4 viewProj = float4x4(g_ViewProjCol0, g_ViewProjCol1, g_ViewProjCol2, g_ViewProjCol3);
+    float4 worldPos = mul(world, float4(VSIn.Pos, 1.0));
+    float3 worldNormal = mul((float3x3)world, VSIn.Normal);
 
-    PSIn.Pos = mul(worldPos, g_ViewProj);
+    PSIn.Pos = mul(viewProj, worldPos);
     PSIn.Normal = worldNormal;
     PSIn.UV = VSIn.UV;
     PSIn.WorldPos = worldPos.xyz;
