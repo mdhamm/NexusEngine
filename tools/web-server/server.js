@@ -20,16 +20,14 @@ const mimeTypes = {
     '.wasm': 'application/wasm'
 };
 
+// Small text files that can be compressed on-the-fly without much overhead
 const compressibleExtensions = new Set([
     '.css',
-    '.data',
     '.html',
-    '.js',
     '.json',
     '.map',
     '.svg',
-    '.txt',
-    '.wasm'
+    '.txt'
 ]);
 
 function setCommonHeaders(response)
@@ -106,24 +104,46 @@ const server = http.createServer((request, response) =>
 
     const extension = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[extension] || 'application/octet-stream';
-    const contentEncoding = getContentEncoding(request, extension);
+    const acceptEncoding = request.headers['accept-encoding'] || '';
 
     response.statusCode = 200;
     response.setHeader('Content-Type', contentType);
 
-    let stream = fs.createReadStream(filePath);
-    if (contentEncoding === 'br')
-    {
-        response.setHeader('Content-Encoding', 'br');
-        stream = stream.pipe(zlib.createBrotliCompress());
-    }
-    else if (contentEncoding === 'gzip')
-    {
-        response.setHeader('Content-Encoding', 'gzip');
-        stream = stream.pipe(zlib.createGzip());
-    }
+    // Try to serve pre-compressed files first (much faster than on-the-fly compression)
+    const brPath = filePath + '.br';
+    const gzPath = filePath + '.gz';
 
-    stream.pipe(response);
+    if (acceptEncoding.includes('br') && fs.existsSync(brPath))
+    {
+        // Serve pre-compressed Brotli file
+        response.setHeader('Content-Encoding', 'br');
+        fs.createReadStream(brPath).pipe(response);
+    }
+    else if (acceptEncoding.includes('gzip') && fs.existsSync(gzPath))
+    {
+        // Serve pre-compressed gzip file
+        response.setHeader('Content-Encoding', 'gzip');
+        fs.createReadStream(gzPath).pipe(response);
+    }
+    else
+    {
+        // Fall back to on-the-fly compression for compressible types
+        const contentEncoding = getContentEncoding(request, extension);
+        let stream = fs.createReadStream(filePath);
+
+        if (contentEncoding === 'br')
+        {
+            response.setHeader('Content-Encoding', 'br');
+            stream = stream.pipe(zlib.createBrotliCompress());
+        }
+        else if (contentEncoding === 'gzip')
+        {
+            response.setHeader('Content-Encoding', 'gzip');
+            stream = stream.pipe(zlib.createGzip());
+        }
+
+        stream.pipe(response);
+    }
 });
 
 server.listen(port, () =>
