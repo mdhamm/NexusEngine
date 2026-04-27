@@ -9,7 +9,7 @@
 #endif // _WIN32
 
 #include "Scene.h"
-#include "common/GraphicsRenderer.h"
+#include "rendering/GraphicsRenderer.h"
 
 #define REF(x) (void)(x)
 

@@ -7,7 +7,7 @@
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
 
-#include "common/GraphicsRenderer.h"
+#include "rendering/GraphicsRenderer.h"
 
 namespace NexusEngine
 {
