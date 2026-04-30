@@ -189,5 +189,29 @@ add_subdirectory(NexusEngine)   # STATIC lib (owns ImGui + bridge)
 add_subdirectory(SampleGame)    # STATIC lib
 add_subdirectory(GameRuntime)   # EXE
 if(NOT BUILD_WEB)
-  add_subdirectory(Editor)      # EXE
+  option(NEXUS_BUILD_EDITOR "Build the Qt-based editor target" ON)
+
+  if(NEXUS_BUILD_EDITOR)
+    if(DEFINED Qt6_DIR AND MSVC AND NOT Qt6_DIR MATCHES "[\\/]msvc")
+      message(WARNING "Ignoring incompatible Qt6_DIR='${Qt6_DIR}'. MSVC builds require a Qt6 msvc kit.")
+      unset(Qt6_DIR CACHE)
+      unset(Qt6_DIR)
+    endif()
+
+    if(NOT DEFINED Qt6_DIR AND EXISTS "C:/Qt")
+      file(GLOB NEXUS_QT6_CONFIGS "C:/Qt/*/msvc*/lib/cmake/Qt6/Qt6Config.cmake")
+      if(NEXUS_QT6_CONFIGS)
+        list(SORT NEXUS_QT6_CONFIGS ORDER DESCENDING)
+        list(GET NEXUS_QT6_CONFIGS 0 NEXUS_QT6_CONFIG)
+        get_filename_component(Qt6_DIR "${NEXUS_QT6_CONFIG}" DIRECTORY)
+        set(Qt6_DIR "${Qt6_DIR}" CACHE PATH "Path to Qt6 CMake package" FORCE)
+      endif()
+    endif()
+
+    if(DEFINED Qt6_DIR)
+      add_subdirectory(Editor)  # EXE
+    else()
+      message(WARNING "Skipping Editor target because a Qt6 MSVC package was not found. Install one under C:/Qt/<version>/msvc*_64 or set Qt6_DIR.")
+    endif()
+  endif()
 endif()

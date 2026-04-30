@@ -10,7 +10,46 @@ endif()
 if(BUILD_WEB)
   set(GAME_MAIN src/main_web.cpp)
 else()
-  set(GAME_MAIN src/main_win32.cpp)
+  set(NEXUS_EDITOR_PREFERRED_QT6_DIR "C:/Qt/6.11.0/msvc2022_64/lib/cmake/Qt6")
+
+  if(NOT DEFINED Qt6_DIR AND EXISTS "${NEXUS_EDITOR_PREFERRED_QT6_DIR}/Qt6Config.cmake")
+    set(Qt6_DIR "${NEXUS_EDITOR_PREFERRED_QT6_DIR}" CACHE PATH "Path to Qt6 CMake package" FORCE)
+  endif()
+
+  if(NOT DEFINED Qt6_DIR AND EXISTS "C:/Qt")
+    file(GLOB QT6_CONFIGS "C:/Qt/*/msvc*/lib/cmake/Qt6/Qt6Config.cmake")
+    if(QT6_CONFIGS)
+      list(SORT QT6_CONFIGS ORDER DESCENDING)
+      list(GET QT6_CONFIGS 0 QT6_CONFIG)
+      get_filename_component(Qt6_DIR "${QT6_CONFIG}" DIRECTORY)
+      set(Qt6_DIR "${Qt6_DIR}" CACHE PATH "Path to Qt6 CMake package" FORCE)
+    else()
+      message(FATAL_ERROR "Qt6 MSVC package not found under C:/Qt. Install a Qt6 msvc kit such as C:/Qt/<version>/msvc2022_64.")
+    endif()
+  endif()
+
+  message(STATUS "Editor configuring with Qt6_DIR='${Qt6_DIR}'")
+  find_package(Qt6 6.11 REQUIRED COMPONENTS Widgets)
+
+  get_filename_component(NEXUS_EDITOR_QT_CMAKE_DIR "${Qt6_DIR}" ABSOLUTE)
+  get_filename_component(NEXUS_EDITOR_QT_LIB_CMAKE_DIR "${NEXUS_EDITOR_QT_CMAKE_DIR}" DIRECTORY)
+  get_filename_component(NEXUS_EDITOR_QT_LIB_DIR "${NEXUS_EDITOR_QT_LIB_CMAKE_DIR}" DIRECTORY)
+  get_filename_component(NEXUS_EDITOR_QT_ROOT_DIR "${NEXUS_EDITOR_QT_LIB_DIR}" DIRECTORY)
+  find_program(NEXUS_EDITOR_WINDEPLOYQT_EXECUTABLE
+    NAMES windeployqt windeployqt.exe
+    HINTS "${NEXUS_EDITOR_QT_ROOT_DIR}/bin")
+
+  set(GAME_MAIN
+    src/main_win32.cpp
+    src/ContentDrawerWidget.cpp
+    src/ContentDrawerWidget.h
+    src/EditorWindow.cpp
+    src/EditorWindow.h
+    src/SceneGraphWidget.cpp
+    src/SceneGraphWidget.h
+    src/SceneViewWidget.cpp
+    src/SceneViewWidget.h
+  )
 endif()
 
 add_executable(Editor ${GAME_MAIN})
@@ -26,8 +65,16 @@ if(BUILD_WEB)
     "-sASSERTIONS=1"
   )
 else()
-  target_link_libraries(Editor PRIVATE DILIGENT_D3D12 NEXUS_SDL)
+  target_link_libraries(Editor PRIVATE DILIGENT_D3D12 NEXUS_SDL Qt6::Widgets)
+  target_compile_definitions(Editor PRIVATE NEXUS_EDITOR_CONTENT_ROOT="${CMAKE_SOURCE_DIR}")
+
+  if(WIN32 AND NEXUS_EDITOR_WINDEPLOYQT_EXECUTABLE)
+    add_custom_command(TARGET Editor POST_BUILD
+      COMMAND "${NEXUS_EDITOR_WINDEPLOYQT_EXECUTABLE}" --no-compiler-runtime "$<TARGET_FILE:Editor>"
+      COMMENT "Deploying Qt runtime for Editor")
+  endif()
+
   if(MSVC)
-    target_compile_options(Editor PRIVATE /permissive- /W4 /EHsc /bigobj)
+    target_compile_options(Editor PRIVATE /permissive- /Zc:__cplusplus /W4 /EHsc /bigobj)
   endif()
 endif()
