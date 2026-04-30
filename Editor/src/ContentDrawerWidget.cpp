@@ -23,6 +23,25 @@ namespace NexusEditor
 {
     namespace
     {
+        class AssetFolderModel : public QFileSystemModel
+        {
+        public:
+            using QFileSystemModel::QFileSystemModel;
+
+            QString RootPath;
+
+            QVariant data(const QModelIndex& index, int role) const override
+            {
+                if (role == Qt::DisplayRole &&
+                    QDir::cleanPath(filePath(index)).compare(QDir::cleanPath(RootPath), Qt::CaseInsensitive) == 0)
+                {
+                    return QStringLiteral("Project Root");
+                }
+
+                return QFileSystemModel::data(index, role);
+            }
+        };
+
         struct PendingAssetDrag
         {
             QStringList m_paths;
@@ -176,10 +195,12 @@ namespace NexusEditor
         auto* splitter = new QSplitter(Qt::Horizontal, this);
         layout->addWidget(splitter);
 
-        m_folderModel = new QFileSystemModel(this);
-        m_folderModel->setReadOnly(false);
-        m_folderModel->setFilter(QDir::AllDirs | QDir::NoDotAndDotDot);
-        m_folderModel->setRootPath(m_contentRootPath);
+        auto* folderModel = new AssetFolderModel(this);
+        folderModel->RootPath = m_contentRootPath;
+        folderModel->setReadOnly(false);
+        folderModel->setFilter(QDir::AllDirs | QDir::NoDotAndDotDot);
+        folderModel->setRootPath(m_contentRootPath);
+        m_folderModel = folderModel;
 
         m_contentModel = new QFileSystemModel(this);
         m_contentModel->setReadOnly(false);
@@ -189,7 +210,11 @@ namespace NexusEditor
         auto* folderTreeView = new AssetFolderTreeView(splitter);
         m_folderTreeView = folderTreeView;
         m_folderTreeView->setModel(m_folderModel);
-        m_folderTreeView->setRootIndex(m_folderModel->index(m_contentRootPath));
+        m_folderTreeView->setRootIndex(
+            m_folderModel->index(QFileInfo(m_contentRootPath).absolutePath())
+        );
+        QModelIndex projectIndex = m_folderModel->index(m_contentRootPath);
+        m_folderTreeView->expand(projectIndex);
         m_folderTreeView->setHeaderHidden(true);
         m_folderTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
         m_folderTreeView->setDragEnabled(true);

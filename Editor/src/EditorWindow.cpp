@@ -48,8 +48,16 @@ namespace NexusEditor
 
     void EditorWindow::BuildLayout()
     {
-        m_sceneView = new SceneViewWidget(this);
-        setCentralWidget(m_sceneView);
+        auto* viewportTabs = new QTabWidget(this);
+        viewportTabs->setDocumentMode(true);
+        viewportTabs->setMovable(true);
+        setCentralWidget(viewportTabs);
+
+        m_sceneView = new SceneViewWidget(viewportTabs);
+        viewportTabs->addTab(m_sceneView, QStringLiteral("Scene"));
+
+        auto* gameView = new QWidget(viewportTabs);
+        viewportTabs->addTab(gameView, QStringLiteral("Game"));
 
         auto* sceneGraphDock = new QDockWidget(QStringLiteral("Scene Graph"), this);
         sceneGraphDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
