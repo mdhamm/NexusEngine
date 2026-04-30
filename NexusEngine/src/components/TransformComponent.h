@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cmath>
 
+#include "ComponentReflection.h"
+
 #include <flecs.h>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 
@@ -371,6 +373,12 @@ namespace NexusEngine
         {
             return m_worldMatrix;
         }
+
+        /// <summary>
+        /// Creates the editor reflection descriptor for the transform component.
+        /// </summary>
+        /// <returns>The transform component descriptor.</returns>
+        static ComponentDescriptor CreateDescriptor();
 
     private:
         friend flecs::entity GetTransformParent(const flecs::entity& entity);
@@ -845,6 +853,111 @@ namespace NexusEngine
                     UpdateWorldRecursive(entity);
                 }
             });
+    }
+
+    inline ComponentDescriptor TransformComponent::CreateDescriptor()
+    {
+        return ComponentDescriptor{
+            "TransformComponent",
+            [](const flecs::entity& entity) { return entity.has<TransformComponent>(); },
+            [](flecs::entity entity) { entity.set(TransformComponent{}); },
+            [](const flecs::entity& entity)
+            {
+                std::vector<ComponentPropertyDescriptor> properties;
+                const auto* transform = entity.get<TransformComponent>();
+                if (!transform)
+                {
+                    return properties;
+                }
+
+                const auto appendVector3Properties =
+                    [&](const char* prefix,
+                        const Diligent::float3& value,
+                        const auto& setter)
+                    {
+                        properties.push_back(ComponentPropertyDescriptor{
+                            std::string(prefix) + ".X",
+                            "float",
+                            ComponentPropertyValueType::Float,
+                            false,
+                            [value](const flecs::entity&) { return FormatComponentFloat(value.x); },
+                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 0, text); } });
+                        properties.push_back(ComponentPropertyDescriptor{
+                            std::string(prefix) + ".Y",
+                            "float",
+                            ComponentPropertyValueType::Float,
+                            false,
+                            [value](const flecs::entity&) { return FormatComponentFloat(value.y); },
+                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 1, text); } });
+                        properties.push_back(ComponentPropertyDescriptor{
+                            std::string(prefix) + ".Z",
+                            "float",
+                            ComponentPropertyValueType::Float,
+                            false,
+                            [value](const flecs::entity&) { return FormatComponentFloat(value.z); },
+                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 2, text); } });
+                    };
+
+                appendVector3Properties(
+                    "Position",
+                    transform->GetLocalPosition(),
+                    [](const flecs::entity& target, int axis, const std::string& text)
+                    {
+                        auto* editable = target.get_mut<TransformComponent>();
+                        if (!editable)
+                        {
+                            return;
+                        }
+
+                        Diligent::float3 value = editable->GetLocalPosition();
+                        const float parsed = std::stof(text);
+                        if (axis == 0) value.x = parsed;
+                        if (axis == 1) value.y = parsed;
+                        if (axis == 2) value.z = parsed;
+                        SetLocalPosition(target, value);
+                    });
+
+                const Diligent::float3 euler = Quaternion::ToEuler(transform->GetLocalRotation());
+                appendVector3Properties(
+                    "Rotation",
+                    euler,
+                    [](const flecs::entity& target, int axis, const std::string& text)
+                    {
+                        auto* editable = target.get_mut<TransformComponent>();
+                        if (!editable)
+                        {
+                            return;
+                        }
+
+                        Diligent::float3 value = Quaternion::ToEuler(editable->GetLocalRotation());
+                        const float parsed = std::stof(text);
+                        if (axis == 0) value.x = parsed;
+                        if (axis == 1) value.y = parsed;
+                        if (axis == 2) value.z = parsed;
+                        SetLocalRotation(target, Quaternion::FromEuler(value));
+                    });
+
+                appendVector3Properties(
+                    "Scale",
+                    transform->GetLocalScale(),
+                    [](const flecs::entity& target, int axis, const std::string& text)
+                    {
+                        auto* editable = target.get_mut<TransformComponent>();
+                        if (!editable)
+                        {
+                            return;
+                        }
+
+                        Diligent::float3 value = editable->GetLocalScale();
+                        const float parsed = std::stof(text);
+                        if (axis == 0) value.x = parsed;
+                        if (axis == 1) value.y = parsed;
+                        if (axis == 2) value.z = parsed;
+                        SetLocalScale(target, value);
+                    });
+
+                return properties;
+            } };
     }
 
 } // namespace NexusEngine

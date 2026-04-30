@@ -1,4 +1,6 @@
 #include "Game.h"
+#include "GameComponents.h"
+#include <ComponentReflection.h>
 #include <Scene.h>
 #include <components/CameraComponent.h>
 #include <components/TransformComponent.h>
@@ -95,23 +97,32 @@ namespace SampleGame
         }
     }
 
-    // ---------- Components ----------
-    struct FlyCameraControllerComponent
+    namespace
     {
-        float m_moveSpeed = 12.0f;
-        float m_lookSensitivity = 0.003f;
-        float m_yaw = 0.0f;
-        float m_pitch = 0.0f;
-        bool m_isRotationInitialized = false;
-    };
+        void RegisterComponentDescriptors()
+        {
+            static bool s_registered = false;
+            if (s_registered)
+            {
+                return;
+            }
 
-    struct RotationSpeed { float m_x = 0, m_y = 0, m_z = 0; };
+            auto& registry = NexusEngine::ComponentReflectionRegistry::Instance();
+
+            registry.RegisterDescriptor(FlyCameraControllerComponent::CreateDescriptor());
+            registry.RegisterDescriptor(RotationSpeed::CreateDescriptor());
+
+            s_registered = true;
+        }
+    }
 
     class Game final : public NexusEngine::IGameApp
     {
     public:
         void OnStartup(NexusEngine::Engine& engine) override
         {
+            RegisterComponentDescriptors();
+
             auto& scene = engine.CreateScene("MainScene");
             engine.SetActiveScene("MainScene");
             auto& w = scene.m_world;
@@ -401,5 +412,10 @@ namespace SampleGame
     std::unique_ptr<NexusEngine::IGameApp> CreateGame()
     {
         return std::make_unique<Game>();
+    }
+
+    void RegisterEditorComponentDescriptors()
+    {
+        RegisterComponentDescriptors();
     }
 } // namespace SampleGame

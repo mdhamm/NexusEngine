@@ -3,14 +3,16 @@
 #include "SceneViewWidget.h"
 
 #include <Scene.h>
+#include <components/TransformComponent.h>
 
 #include <QHeaderView>
-#include <QTimer>
+#include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -36,16 +38,53 @@ namespace NexusEditor
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
+        auto* addEntityButton = new QPushButton(QStringLiteral("Add Entity"), this);
+        layout->addWidget(addEntityButton);
+
         m_treeWidget = new QTreeWidget(this);
         m_treeWidget->setColumnCount(1);
         m_treeWidget->setHeaderLabel(QStringLiteral("Scene"));
         m_treeWidget->header()->setStretchLastSection(true);
         layout->addWidget(m_treeWidget);
 
-        auto* refreshTimer = new QTimer(this);
-        refreshTimer->setInterval(500);
-        connect(refreshTimer, &QTimer::timeout, this, [this]() { Refresh(); });
-        refreshTimer->start();
+        connect(addEntityButton, &QPushButton::clicked, this, [this]()
+            {
+                static std::uint64_t s_entityCounter = 1;
+
+                if (!m_sceneView || !m_sceneView->IsInitialized())
+                {
+                    return;
+                }
+
+                NexusEngine::Scene* activeScene = m_sceneView->GetActiveScene();
+                if (!activeScene)
+                {
+                    return;
+                }
+
+                const std::string entityName = "Entity_" + std::to_string(static_cast<unsigned long long>(s_entityCounter++));
+                const flecs::entity entity = activeScene->CreateEntity(entityName.c_str())
+                    .set(NexusEngine::TransformComponent{});
+                m_selectedEntityId = static_cast<std::uint64_t>(entity.id());
+                Refresh();
+                if (m_onSelectionChanged)
+                {
+                    m_onSelectionChanged(m_selectedEntityId);
+                }
+            });
+
+        connect(m_treeWidget, &QTreeWidget::currentItemChanged, this,
+            [this](QTreeWidgetItem* current, QTreeWidgetItem*)
+            {
+                m_selectedEntityId = current
+                    ? static_cast<std::uint64_t>(current->data(0, Qt::UserRole).toULongLong())
+                    : 0;
+
+                if (m_onSelectionChanged)
+                {
+                    m_onSelectionChanged(m_selectedEntityId);
+                }
+            });
 
         Refresh();
     }
@@ -74,9 +113,11 @@ namespace NexusEditor
             return;
         }
 
+        m_treeWidget->setHeaderLabel(QStringLiteral("Scene - %1").arg(activeScene->m_name.c_str()));
+
         std::vector<flecs::entity> entities;
-        activeScene->m_world.each(
-            [&](flecs::entity entity)
+        activeScene->m_world.each<NexusEngine::TransformComponent>(
+            [&](flecs::entity entity, NexusEngine::TransformComponent&)
             {
                 if (entity.is_valid() && entity.is_alive())
                 {
@@ -125,6 +166,21 @@ namespace NexusEditor
             m_treeWidget->addTopLevelItem(item);
         }
 
+        if (m_selectedEntityId != 0)
+        {
+            auto selectedIt = itemsById.find(m_selectedEntityId);
+            if (selectedIt != itemsById.end())
+            {
+                m_treeWidget->setCurrentItem(selectedIt->second);
+                m_treeWidget->scrollToItem(selectedIt->second);
+            }
+        }
+
         m_treeWidget->expandToDepth(1);
+    }
+
+    void SceneGraphWidget::SetSelectionChangedCallback(std::function<void(std::uint64_t)> callback)
+    {
+        m_onSelectionChanged = std::move(callback);
     }
 } // namespace NexusEditor

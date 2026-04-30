@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include "ComponentReflection.h"
 #include "components/CameraComponent.h"
 #include "components/RenderMeshComponent.h"
 #include "components/TransformComponent.h"
@@ -20,6 +21,22 @@ namespace NexusEngine
 {
     namespace
     {
+        void RegisterBuiltinComponentDescriptors()
+        {
+            static bool s_registered = false;
+            if (s_registered)
+            {
+                return;
+            }
+
+            auto& registry = ComponentReflectionRegistry::Instance();
+            registry.RegisterDescriptor(TransformComponent::CreateDescriptor());
+            registry.RegisterDescriptor(CameraComponent::CreateDescriptor());
+            registry.RegisterDescriptor(RenderMeshComponent::CreateDescriptor());
+
+            s_registered = true;
+        }
+
         // Store matrix as 4 columns (float4 each) to avoid WGSL row-major matrix limitation
         struct InstanceTransformData
         {
@@ -109,6 +126,7 @@ namespace NexusEngine
 
     void Scene::RegisterSceneComponents()
     {
+        RegisterBuiltinComponentDescriptors();
         m_world.component<CameraComponent>();
         m_world.component<RenderTextureComponent>();
         m_world.component<RenderMeshComponent>();

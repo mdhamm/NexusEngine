@@ -2,6 +2,9 @@
 
 #include <QWidget>
 
+#include <cstdint>
+#include <functional>
+
 class QTreeWidget;
 
 namespace NexusEditor
@@ -23,8 +26,16 @@ namespace NexusEditor
         /// </summary>
         void Refresh();
 
+        /// <summary>
+        /// Sets the callback invoked when the selected entity changes.
+        /// </summary>
+        /// <param name="callback">Callback receiving the selected entity id.</param>
+        void SetSelectionChangedCallback(std::function<void(std::uint64_t)> callback);
+
     private:
         SceneViewWidget* m_sceneView = nullptr;
         QTreeWidget* m_treeWidget = nullptr;
+        std::function<void(std::uint64_t)> m_onSelectionChanged;
+        std::uint64_t m_selectedEntityId = 0;
     };
 } // namespace NexusEditor

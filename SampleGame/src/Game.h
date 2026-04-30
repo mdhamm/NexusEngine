@@ -5,6 +5,11 @@
 namespace SampleGame
 {
     /// <summary>
+    /// Registers the sample game component descriptors with the editor reflection registry.
+    /// </summary>
+    void RegisterEditorComponentDescriptors();
+
+    /// <summary>
     /// Creates the sample game implementation used by the runtime.
     /// </summary>
     /// <returns>The created game implementation.</returns>

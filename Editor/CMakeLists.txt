@@ -41,10 +41,23 @@ else()
 
   set(GAME_MAIN
     src/main_win32.cpp
+    src/AssetFileReference.cpp
+    src/AssetFileReference.h
     src/ContentDrawerWidget.cpp
     src/ContentDrawerWidget.h
+    src/EditorProject.h
+    src/EditorProjectRegistry.cpp
+    src/EditorProjectRegistry.h
+    src/EditorSceneApp.cpp
+    src/EditorSceneApp.h
+    src/EditorSceneSerializer.cpp
+    src/EditorSceneSerializer.h
     src/EditorWindow.cpp
     src/EditorWindow.h
+    src/PropertyWidget.cpp
+    src/PropertyWidget.h
+    src/ProjectBrowserWindow.cpp
+    src/ProjectBrowserWindow.h
     src/SceneGraphWidget.cpp
     src/SceneGraphWidget.h
     src/SceneViewWidget.cpp

@@ -1,5 +1,8 @@
 #include "SceneViewWidget.h"
 
+#include "EditorSceneApp.h"
+#include "EditorSceneSerializer.h"
+
 #include <QResizeEvent>
 #include <QTimer>
 
@@ -21,6 +24,7 @@ namespace NexusEditor
     SceneViewWidget::SceneViewWidget(QWidget* parent)
         : QWidget(parent)
     {
+        setWindowTitle(QStringLiteral("Scene"));
         setAttribute(Qt::WA_NativeWindow, true);
         setAttribute(Qt::WA_PaintOnScreen, true);
         setAttribute(Qt::WA_NoSystemBackground, true);
@@ -47,9 +51,52 @@ namespace NexusEditor
         return &m_engine;
     }
 
+    NexusEngine::Scene* SceneViewWidget::GetActiveScene()
+    {
+        return m_engine.ActiveScene();
+    }
+
     bool SceneViewWidget::IsInitialized() const
     {
         return m_isInitialized;
+    }
+
+    bool SceneViewWidget::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
+    {
+        if (!m_isInitialized || filePath.isEmpty())
+        {
+            return false;
+        }
+
+        NexusEngine::Scene* activeScene = const_cast<SceneViewWidget*>(this)->m_engine.ActiveScene();
+        return activeScene ? SaveSceneToFile(*activeScene, filePath, assetGuid) : false;
+    }
+
+    bool SceneViewWidget::LoadScene(const QString& filePath)
+    {
+        EnsureEngineInitialized();
+        if (!m_isInitialized || filePath.isEmpty())
+        {
+            return false;
+        }
+
+        NexusEngine::Scene* activeScene = m_engine.ActiveScene();
+        if (!activeScene || !LoadSceneFromFile(*activeScene, filePath))
+        {
+            return false;
+        }
+
+        if (m_onSceneReady)
+        {
+            m_onSceneReady();
+        }
+
+        return true;
+    }
+
+    void SceneViewWidget::SetSceneReadyCallback(std::function<void()> callback)
+    {
+        m_onSceneReady = std::move(callback);
     }
 
     QPaintEngine* SceneViewWidget::paintEngine() const
@@ -82,7 +129,9 @@ namespace NexusEditor
 
         createWinId();
 
-        std::unique_ptr<NexusEngine::IGameApp> game = SampleGame::CreateGame();
+        SampleGame::RegisterEditorComponentDescriptors();
+
+        std::unique_ptr<NexusEngine::IGameApp> game = std::make_unique<EditorSceneApp>();
         if (!game)
         {
             return;
@@ -97,6 +146,12 @@ namespace NexusEditor
         if (m_isInitialized)
         {
             m_previousFrameTime = std::chrono::steady_clock::now();
+            TickFrame();
+
+            if (m_onSceneReady)
+            {
+                m_onSceneReady();
+            }
         }
     }
 

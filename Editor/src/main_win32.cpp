@@ -2,8 +2,10 @@
 
 #include <SDL.h>
 #include <cstdio>
+#include <memory>
 
 #include "EditorWindow.h"
+#include "ProjectBrowserWindow.h"
 
 static void ReportError(const char* title, const char* detail)
 {
@@ -27,8 +29,18 @@ int main(int argc, char** argv)
     app.setApplicationName(QStringLiteral("Nexus Editor"));
     app.setOrganizationName(QStringLiteral("NexusEngine"));
 
-    NexusEditor::EditorWindow window;
-    window.show();
+    NexusEditor::ProjectBrowserWindow projectBrowser;
+    std::unique_ptr<NexusEditor::EditorWindow> editorWindow;
+
+    projectBrowser.SetProjectOpenedCallback(
+        [&](const NexusEditor::EditorProject& project)
+        {
+            editorWindow = std::make_unique<NexusEditor::EditorWindow>(project);
+            editorWindow->show();
+            projectBrowser.close();
+        });
+
+    projectBrowser.show();
 
     const int exitCode = app.exec();
     SDL_Quit();

@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 add_library(SampleGame STATIC
   src/Game.cpp
   src/Game.h
+  src/GameComponents.h
   # your ECS registration, components, systems, content bootstrap, etc.
 )
 
