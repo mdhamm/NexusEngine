@@ -94,6 +94,11 @@ namespace NexusEditor
         }
 
         m_engine.RunFrame(deltaSeconds);
+
+        if (m_propertyWidget)
+        {
+            m_propertyWidget->RefreshIfNotInteracting();
+        }
     }
 
     QtInputBackend& EditorWindow::GetInputBackend()

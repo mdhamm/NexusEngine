@@ -8,6 +8,8 @@
 
 #include <cstdint>
 
+class QString;
+
 class QComboBox;
 class QVBoxLayout;
 
@@ -36,13 +38,22 @@ namespace NexusEditor
         /// </summary>
         void Refresh();
 
+        /// <summary>
+        /// Refreshes the property inspector only when the user is not actively interacting with it.
+        /// </summary>
+        void RefreshIfNotInteracting();
+
     private:
+        QString CaptureStructureSignature() const;
+        void SyncDisplayedValues();
         void RebuildContents();
         void RebuildAddComponentOptions();
+        bool IsInteracting() const;
 
         EditorWindow* m_editorWindow = nullptr;
         QComboBox* m_addComponentComboBox = nullptr;
         QVBoxLayout* m_contentLayout = nullptr;
         std::uint64_t m_selectedEntityId = 0;
+        QString m_lastStructureSignature;
     };
 } // namespace NexusEditor

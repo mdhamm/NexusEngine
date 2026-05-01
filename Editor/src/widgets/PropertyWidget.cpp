@@ -2,6 +2,7 @@
 
 #include "EditorWindow.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
@@ -10,6 +11,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSignalBlocker>
+#include <QString>
 #include <QVBoxLayout>
 
 #ifdef emit
@@ -28,6 +31,8 @@ namespace NexusEditor
 {
     namespace
     {
+        constexpr const char* EntityNameLabelObjectName = "PropertyWidget.EntityName";
+
         void ClearLayout(QLayout* layout)
         {
             while (QLayoutItem* item = layout->takeAt(0))
@@ -45,6 +50,12 @@ namespace NexusEditor
 
                 delete item;
             }
+        }
+
+        QString MakePropertyControlObjectName(const std::string& componentName, const std::string& propertyName)
+        {
+            return QStringLiteral("PropertyWidget.%1.%2")
+                .arg(QString::fromStdString(componentName), QString::fromStdString(propertyName));
         }
     }
 
@@ -122,6 +133,167 @@ namespace NexusEditor
     {
         RebuildAddComponentOptions();
         RebuildContents();
+        m_lastStructureSignature = CaptureStructureSignature();
+    }
+
+    void PropertyWidget::RefreshIfNotInteracting()
+    {
+        if (IsInteracting())
+        {
+            return;
+        }
+
+        const QString currentStructureSignature = CaptureStructureSignature();
+        if (currentStructureSignature == m_lastStructureSignature)
+        {
+            SyncDisplayedValues();
+            return;
+        }
+
+        Refresh();
+    }
+
+    bool PropertyWidget::IsInteracting() const
+    {
+        QWidget* focusedWidget = QApplication::focusWidget();
+        return focusedWidget && (focusedWidget == this || isAncestorOf(focusedWidget));
+    }
+
+    QString PropertyWidget::CaptureStructureSignature() const
+    {
+        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        {
+            return QStringLiteral("state:initializing");
+        }
+
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
+        if (!activeScene)
+        {
+            return QStringLiteral("state:no-scene");
+        }
+
+        if (m_selectedEntityId == 0)
+        {
+            return QStringLiteral("state:no-selection");
+        }
+
+        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive())
+        {
+            return QStringLiteral("state:invalid-selection");
+        }
+
+        QString signature = QStringLiteral("entity:%1")
+            .arg(static_cast<qulonglong>(m_selectedEntityId));
+
+        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        {
+            if (!descriptor.m_hasComponent || !descriptor.m_hasComponent(entity))
+            {
+                continue;
+            }
+
+            signature += QStringLiteral("|component:%1").arg(QString::fromStdString(descriptor.m_name));
+
+            const std::vector<NexusEngine::ComponentPropertyDescriptor> properties =
+                descriptor.m_getProperties ? descriptor.m_getProperties(entity) : std::vector<NexusEngine::ComponentPropertyDescriptor>{};
+
+            for (const auto& property : properties)
+            {
+                signature += QStringLiteral("|property:%1:%2:%3:%4")
+                    .arg(QString::fromStdString(property.m_name))
+                    .arg(QString::fromStdString(property.m_typeName))
+                    .arg(static_cast<int>(property.m_valueType))
+                    .arg(property.m_isReadOnly ? 1 : 0);
+            }
+        }
+
+        signature += QStringLiteral("|addable:");
+        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        {
+            if (!descriptor.m_addComponent || (descriptor.m_hasComponent && descriptor.m_hasComponent(entity)))
+            {
+                continue;
+            }
+
+            signature += QString::fromStdString(descriptor.m_name);
+            signature += QLatin1Char(';');
+        }
+
+        return signature;
+    }
+
+    void PropertyWidget::SyncDisplayedValues()
+    {
+        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        {
+            return;
+        }
+
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
+        if (!activeScene || m_selectedEntityId == 0)
+        {
+            return;
+        }
+
+        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive())
+        {
+            return;
+        }
+
+        if (auto* entityNameLabel = findChild<QLabel*>(QString::fromUtf8(EntityNameLabelObjectName)))
+        {
+            const char* entityName = entity.name();
+            const QString newEntityLabel = entityName && entityName[0] != '\0'
+                ? QString::fromUtf8(entityName)
+                : QStringLiteral("Entity %1").arg(static_cast<qulonglong>(m_selectedEntityId));
+            if (entityNameLabel->text() != newEntityLabel)
+            {
+                entityNameLabel->setText(newEntityLabel);
+            }
+        }
+
+        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        {
+            if (!descriptor.m_hasComponent || !descriptor.m_hasComponent(entity))
+            {
+                continue;
+            }
+
+            const std::vector<NexusEngine::ComponentPropertyDescriptor> properties =
+                descriptor.m_getProperties ? descriptor.m_getProperties(entity) : std::vector<NexusEngine::ComponentPropertyDescriptor>{};
+
+            for (const auto& property : properties)
+            {
+                const QString objectName = MakePropertyControlObjectName(descriptor.m_name, property.m_name);
+                if (property.m_valueType == NexusEngine::ComponentPropertyValueType::Bool)
+                {
+                    if (auto* checkBox = findChild<QCheckBox*>(objectName))
+                    {
+                        const bool isChecked = property.m_getValue && property.m_getValue(entity) == "true";
+                        const bool isEnabled = !property.m_isReadOnly && static_cast<bool>(property.m_setValue);
+                        QSignalBlocker blocker(checkBox);
+                        checkBox->setChecked(isChecked);
+                        checkBox->setEnabled(isEnabled);
+                    }
+                }
+                else
+                {
+                    if (auto* lineEdit = findChild<QLineEdit*>(objectName))
+                    {
+                        const QString newValue = property.m_getValue ? QString::fromStdString(property.m_getValue(entity)) : QString{};
+                        const bool isReadOnly = property.m_isReadOnly || !property.m_setValue;
+                        QSignalBlocker blocker(lineEdit);
+                        if (lineEdit->text() != newValue)
+                        {
+                            lineEdit->setText(newValue);
+                        }
+                        lineEdit->setReadOnly(isReadOnly);
+                    }
+                }
+            }
+        }
     }
 
     void PropertyWidget::RebuildContents()
@@ -156,11 +328,13 @@ namespace NexusEditor
         }
 
         const char* entityName = entity.name();
-        m_contentLayout->addWidget(new QLabel(
+        auto* entityNameLabel = new QLabel(
             entityName && entityName[0] != '\0'
                 ? QString::fromUtf8(entityName)
                 : QStringLiteral("Entity %1").arg(static_cast<qulonglong>(m_selectedEntityId)),
-            this));
+            this);
+        entityNameLabel->setObjectName(QString::fromUtf8(EntityNameLabelObjectName));
+        m_contentLayout->addWidget(entityNameLabel);
 
         bool addedAnyComponents = false;
         for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
@@ -182,6 +356,7 @@ namespace NexusEditor
                 if (property.m_valueType == NexusEngine::ComponentPropertyValueType::Bool)
                 {
                     auto* checkBox = new QCheckBox(groupBox);
+                    checkBox->setObjectName(MakePropertyControlObjectName(descriptor.m_name, property.m_name));
                     checkBox->setChecked(property.m_getValue && property.m_getValue(entity) == "true");
                     checkBox->setEnabled(!property.m_isReadOnly && static_cast<bool>(property.m_setValue));
                     if (!property.m_isReadOnly && property.m_setValue)
@@ -197,6 +372,7 @@ namespace NexusEditor
                 else
                 {
                     auto* lineEdit = new QLineEdit(groupBox);
+                    lineEdit->setObjectName(MakePropertyControlObjectName(descriptor.m_name, property.m_name));
                     lineEdit->setText(property.m_getValue ? QString::fromStdString(property.m_getValue(entity)) : QString{});
                     lineEdit->setReadOnly(property.m_isReadOnly || !property.m_setValue);
                     if (!property.m_isReadOnly && property.m_setValue)
