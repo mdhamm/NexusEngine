@@ -106,6 +106,17 @@ namespace NexusEditor
         return m_inputBackend;
     }
 
+    void EditorWindow::ResizeSceneViewport(int width, int height)
+    {
+        EnsureEngineInitialized();
+        if (!m_isEngineInitialized)
+        {
+            return;
+        }
+
+        m_engine.ResizeOutput(width, height);
+    }
+
     void EditorWindow::BuildMenus()
     {
         auto* fileMenu = menuBar()->addMenu(QStringLiteral("&File"));

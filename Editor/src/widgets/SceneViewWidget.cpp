@@ -98,10 +98,17 @@ namespace NexusEditor
     {
         QWidget::resizeEvent(event);
 
-        if (m_editorWindow && !m_editorWindow->IsEngineInitialized())
+        if (!m_editorWindow)
+        {
+            return;
+        }
+
+        if (!m_editorWindow->IsEngineInitialized())
         {
             m_editorWindow->EnsureEngineInitialized();
         }
+
+        m_editorWindow->ResizeSceneViewport(width(), height());
     }
 
     void SceneViewWidget::keyPressEvent(QKeyEvent* event)

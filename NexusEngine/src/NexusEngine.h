@@ -117,6 +117,13 @@ namespace NexusEngine
         /// <param name="backend">Input backend to use for the current game session.</param>
         inline void SetInputBackend(IInputBackend* backend) { m_inputBackend = backend; }
 
+        /// <summary>
+        /// Resizes the engine output surface.
+        /// </summary>
+        /// <param name="width">New output width in pixels.</param>
+        /// <param name="height">New output height in pixels.</param>
+        void ResizeOutput(int width, int height);
+
     private:
         void Tick(float dt);
         //void BeginUiFrame(float dt);

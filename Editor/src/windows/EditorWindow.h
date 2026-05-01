@@ -83,6 +83,13 @@ namespace NexusEditor
         /// </summary>
         void EnsureEngineInitialized();
 
+        /// <summary>
+        /// Resizes the editor-owned render target to match the scene view.
+        /// </summary>
+        /// <param name="width">New viewport width in pixels.</param>
+        /// <param name="height">New viewport height in pixels.</param>
+        void ResizeSceneViewport(int width, int height);
+
     private:
         void BuildMenus();
         void BuildLayout();

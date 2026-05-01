@@ -71,6 +71,13 @@ namespace NexusEngine
         /// </summary>
         void EndFrame();
 
+        /// <summary>
+        /// Resizes the swap chain render target to match a new output size.
+        /// </summary>
+        /// <param name="width">New output width in pixels.</param>
+        /// <param name="height">New output height in pixels.</param>
+        void ResizeSwapchain(int width, int height);
+
         // Core graphics interfaces used by the rest of the engine.
         GfxContext m_gfx;
     };

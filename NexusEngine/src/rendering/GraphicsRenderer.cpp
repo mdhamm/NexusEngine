@@ -131,6 +131,16 @@ namespace NexusEngine
             return;
         }
 
+        const auto& swapChainDesc = m_gfx.m_swapchain->GetDesc();
+        Viewport viewport;
+        viewport.TopLeftX = 0.0f;
+        viewport.TopLeftY = 0.0f;
+        viewport.Width = static_cast<float>(swapChainDesc.Width);
+        viewport.Height = static_cast<float>(swapChainDesc.Height);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        m_gfx.m_ctx->SetViewports(1, &viewport, swapChainDesc.Width, swapChainDesc.Height);
+
         Diligent::ITextureView* pRTV = m_gfx.m_swapchain->GetCurrentBackBufferRTV();
         Diligent::ITextureView* pDSV = m_gfx.m_swapchain->GetDepthBufferDSV();
 
@@ -150,5 +160,24 @@ namespace NexusEngine
         {
             m_gfx.m_swapchain->Present();
         }
+    }
+
+    void GraphicsRenderer::ResizeSwapchain(int width, int height)
+    {
+        if (!m_gfx.m_swapchain || width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        const auto& swapChainDesc = m_gfx.m_swapchain->GetDesc();
+        const Uint32 newWidth = static_cast<Uint32>(width);
+        const Uint32 newHeight = static_cast<Uint32>(height);
+        if (swapChainDesc.Width == newWidth && swapChainDesc.Height == newHeight)
+        {
+            return;
+        }
+
+        m_gfx.m_ctx->Flush();
+        m_gfx.m_swapchain->Resize(newWidth, newHeight);
     }
 } // namespace NexusEngine

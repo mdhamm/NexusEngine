@@ -126,6 +126,16 @@ namespace NexusEngine
         }
     }
 
+    void Engine::ResizeOutput(int width, int height)
+    {
+        if (!m_initialized)
+        {
+            return;
+        }
+
+        m_graphicsRenderer.ResizeSwapchain(width, height);
+    }
+
     // --------------------------------------------------------------
     // Main Tick / Frame Loop
     // --------------------------------------------------------------
