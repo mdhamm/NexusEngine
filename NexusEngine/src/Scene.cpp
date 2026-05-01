@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
+#include <NexusEngine.cpp>
 
 using namespace Diligent;
 namespace NexusEngine
@@ -98,20 +99,21 @@ namespace NexusEngine
         }
     }
 
-    Scene::Scene(GraphicsRenderer& graphicsRenderer, const std::string& name)
+    Scene::Scene(GraphicsRenderer& graphicsRenderer, Engine& engine, const std::string& name)
         : m_name(name)
-        , m_graphicsRenderer(graphicsRenderer)
+        , m_engine(&engine)
+        , m_graphicsRenderer(&graphicsRenderer)
     {
         RegisterSceneComponents();
         RegisterPhases();
         RegisterSystems();
 
         // Initialize resource factory for creating meshes and materials
-        if (m_graphicsRenderer.m_gfx.m_device && m_graphicsRenderer.m_gfx.m_ctx)
+        if (m_graphicsRenderer->m_gfx.m_device && m_graphicsRenderer->m_gfx.m_ctx)
         {
             m_resourceFactory = std::make_unique<RenderResourceFactory>(
-                m_graphicsRenderer.m_gfx.m_device, 
-                m_graphicsRenderer.m_gfx.m_ctx);
+                m_graphicsRenderer->m_gfx.m_device, 
+                m_graphicsRenderer->m_gfx.m_ctx);
         }
     }
 
@@ -136,15 +138,10 @@ namespace NexusEngine
 
     void Scene::RegisterPhases()
     {
-        // Input happens before gameplay
-        m_world.component<InputPhase>()
-            .add(flecs::Phase)
-            .depends_on(flecs::PreUpdate);
-
         // Gameplay logic (abilities, AI, etc.)
         m_world.component<GameplayPhase>()
             .add(flecs::Phase)
-            .depends_on<InputPhase>();
+            .depends_on(flecs::PreUpdate);
 
         // Physics updates (movement resolution, collisions)
         m_world.component<PhysicsPhase>()
@@ -195,13 +192,13 @@ namespace NexusEngine
                     const float g = 0.12f + 0.05f * std::sin(m_clearAnimationTime * 1.3f + 1.0f);
                     const float b = 0.16f + 0.05f * std::sin(m_clearAnimationTime * 0.9f + 2.0f);
 
-                    m_graphicsRenderer.BeginFrame(r, g, b, 1.0f);
+                    m_graphicsRenderer->BeginFrame(r, g, b, 1.0f);
                 });
 
         m_world.system<TransformComponent, FlyCameraComponent, CameraComponent>("UpdateFlyCamera")
             .kind<GameplayPhase>()
             .iter(
-                [](flecs::iter& it, TransformComponent* transforms, FlyCameraComponent* controllers, CameraComponent*)
+                [engine = m_engine](flecs::iter& it, TransformComponent* transforms, FlyCameraComponent* controllers, CameraComponent*)
                 {
                     const float dt = static_cast<float>(it.delta_time());
                     const Uint8* keyboardState = SDL_GetKeyboardState(nullptr);
@@ -248,20 +245,25 @@ namespace NexusEngine
 
                         SetWorldRotation(entity, worldRotation);
 
+                        const NexusEngine::InputState& input = engine->GetInputState();
                         Diligent::float3 movement(0.0f, 0.0f, 0.0f);
-                        if (keyboardState[SDL_SCANCODE_W])
+
+                        if (input.IsKeyDown(NexusEngine::InputKey::W))
                         {
                             movement += forward;
                         }
-                        if (keyboardState[SDL_SCANCODE_S])
+
+                        if (input.IsKeyDown(NexusEngine::InputKey::S))
                         {
                             movement -= forward;
                         }
-                        if (keyboardState[SDL_SCANCODE_D])
+
+                        if (input.IsKeyDown(NexusEngine::InputKey::D))
                         {
                             movement += right;
                         }
-                        if (keyboardState[SDL_SCANCODE_A])
+
+                        if (input.IsKeyDown(NexusEngine::InputKey::A))
                         {
                             movement -= right;
                         }
@@ -279,8 +281,8 @@ namespace NexusEngine
             .each(
                 [this](flecs::entity cameraEntity, CameraComponent& cam)
                 {
-                    auto& ctx = m_graphicsRenderer.m_gfx.m_ctx;
-                    auto& swapchain = m_graphicsRenderer.m_gfx.m_swapchain;
+                    auto& ctx = m_graphicsRenderer->m_gfx.m_ctx;
+                    auto& swapchain = m_graphicsRenderer->m_gfx.m_swapchain;
                     if (!ctx || !swapchain)
                     {
                         return;
@@ -471,7 +473,7 @@ namespace NexusEngine
             .iter(
                 [this](flecs::iter&)
                 {
-                    m_graphicsRenderer.EndFrame();
+                    m_graphicsRenderer->EndFrame();
                 });
     }
 
@@ -487,7 +489,7 @@ namespace NexusEngine
             return true;
         }
 
-        auto* device = m_graphicsRenderer.m_gfx.m_device.RawPtr();
+        auto* device = m_graphicsRenderer->m_gfx.m_device.RawPtr();
         if (!device)
         {
             return false;

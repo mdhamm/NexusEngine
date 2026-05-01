@@ -1,20 +1,28 @@
 #include "EditorWindow.h"
 
-#include "ContentDrawerWidget.h"
-#include "PropertyWidget.h"
-#include "SceneGraphWidget.h"
-#include "SceneViewWidget.h"
+#include "EditorSceneApp.h"
+#include "EditorSceneSerializer.h"
+#include "widgets/ContentDrawerWidget.h"
+#include "widgets/PropertyWidget.h"
+#include "widgets/SceneGraphWidget.h"
+#include "widgets/SceneViewWidget.h"
 
-#include <QAction>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
-#include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
-#include <QString>
+#include <QTabWidget>
 
+#ifdef emit
+#undef emit
+#endif
+
+#include <Game.h>
+
+#include <algorithm>
 #include <cstdint>
+#include <memory>
 
 #ifndef NEXUS_EDITOR_CONTENT_ROOT
 #define NEXUS_EDITOR_CONTENT_ROOT "."
@@ -26,13 +34,71 @@ namespace NexusEditor
         : QMainWindow(parent)
         , m_project(project)
     {
+        m_inputBackend.SetInputState(&m_engine.GetInputState());
+        m_engine.SetInputBackend(&m_inputBackend);
+
         setWindowTitle(QStringLiteral("Nexus Editor - %1").arg(m_project.m_name));
         resize(1600, 900);
         setDockNestingEnabled(true);
         m_sceneFileReference.BindToPath(QDir(m_project.m_rootPath).filePath(QStringLiteral("EditorScene.nscene")));
         BuildMenus();
         BuildLayout();
+        EnsureEngineInitialized();
         statusBar()->showMessage(QStringLiteral("Ready - %1").arg(m_project.m_rootPath));
+    }
+
+    NexusEngine::Engine* EditorWindow::GetEngine()
+    {
+        return &m_engine;
+    }
+
+    NexusEngine::Scene* EditorWindow::GetActiveScene()
+    {
+        return m_engine.ActiveScene();
+    }
+
+    bool EditorWindow::IsEngineInitialized() const
+    {
+        return m_isEngineInitialized;
+    }
+
+    bool EditorWindow::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
+    {
+        if (!m_isEngineInitialized || filePath.isEmpty())
+        {
+            return false;
+        }
+
+        NexusEngine::Scene* activeScene = const_cast<NexusEngine::Engine&>(m_engine).ActiveScene();
+        return activeScene ? SaveSceneToFile(*activeScene, filePath, assetGuid) : false;
+    }
+
+    bool EditorWindow::LoadScene(const QString& filePath)
+    {
+        EnsureEngineInitialized();
+        if (!m_isEngineInitialized || filePath.isEmpty())
+        {
+            return false;
+        }
+
+        NexusEngine::Scene* activeScene = m_engine.ActiveScene();
+        return activeScene ? LoadSceneFromFile(*activeScene, filePath) : false;
+    }
+
+    void EditorWindow::TickEngineFrame(float deltaSeconds)
+    {
+        EnsureEngineInitialized();
+        if (!m_isEngineInitialized)
+        {
+            return;
+        }
+
+        m_engine.RunFrame(deltaSeconds);
+    }
+
+    QtInputBackend& EditorWindow::GetInputBackend()
+    {
+        return m_inputBackend;
     }
 
     void EditorWindow::BuildMenus()
@@ -53,7 +119,7 @@ namespace NexusEditor
         viewportTabs->setMovable(true);
         setCentralWidget(viewportTabs);
 
-        m_sceneView = new SceneViewWidget(viewportTabs);
+        m_sceneView = new SceneViewWidget(*this, viewportTabs);
         viewportTabs->addTab(m_sceneView, QStringLiteral("Scene"));
 
         auto* gameView = new QWidget(viewportTabs);
@@ -61,13 +127,13 @@ namespace NexusEditor
 
         auto* sceneGraphDock = new QDockWidget(QStringLiteral("Scene Graph"), this);
         sceneGraphDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-        m_sceneGraph = new SceneGraphWidget(m_sceneView, sceneGraphDock);
+        m_sceneGraph = new SceneGraphWidget(*this, sceneGraphDock);
         sceneGraphDock->setWidget(m_sceneGraph);
         addDockWidget(Qt::LeftDockWidgetArea, sceneGraphDock);
 
         auto* propertyDock = new QDockWidget(QStringLiteral("Properties"), this);
         propertyDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-        m_propertyWidget = new PropertyWidget(m_sceneView, propertyDock);
+        m_propertyWidget = new PropertyWidget(*this, propertyDock);
         propertyDock->setWidget(m_propertyWidget);
         addDockWidget(Qt::RightDockWidgetArea, propertyDock);
 
@@ -100,7 +166,7 @@ namespace NexusEditor
         m_contentDrawer->SetSceneOpenedCallback(
             [this](const QString& sceneFilePath)
             {
-                if (!m_sceneView || !m_sceneView->LoadScene(sceneFilePath))
+                if (!LoadScene(sceneFilePath))
                 {
                     statusBar()->showMessage(QStringLiteral("Failed to load scene %1").arg(sceneFilePath), 3000);
                     return;
@@ -127,6 +193,29 @@ namespace NexusEditor
             });
         contentDrawerDock->setWidget(m_contentDrawer);
         addDockWidget(Qt::BottomDockWidgetArea, contentDrawerDock);
+    }
+
+    void EditorWindow::EnsureEngineInitialized()
+    {
+        if (m_isEngineInitialized || !m_sceneView)
+        {
+            return;
+        }
+
+        SampleGame::RegisterEditorComponentDescriptors();
+
+        std::unique_ptr<NexusEngine::IGameApp> game = std::make_unique<EditorSceneApp>();
+        if (!game)
+        {
+            return;
+        }
+
+        NexusEngine::NativeWindow nativeWindow{};
+        nativeWindow.m_width = std::max(1, m_sceneView->width());
+        nativeWindow.m_height = std::max(1, m_sceneView->height());
+        nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
+
+        m_isEngineInitialized = m_engine.Initialize(nativeWindow, std::move(game));
     }
 
     void EditorWindow::UpdateLoadedSceneFilePath(const QString& oldPath, const QString& newPath)
@@ -163,7 +252,7 @@ namespace NexusEditor
             return;
         }
 
-        if (m_sceneView && m_sceneView->SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
+        if (SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
         {
             statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(m_sceneFileReference.GetPath()), 3000);
         }
@@ -188,7 +277,7 @@ namespace NexusEditor
 
         m_sceneFileReference.BindToPath(filePath);
 
-        if (m_sceneView && m_sceneView->SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
+        if (SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
         {
             statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(m_sceneFileReference.GetPath()), 3000);
         }

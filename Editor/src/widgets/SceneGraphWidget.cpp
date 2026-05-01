@@ -1,6 +1,6 @@
 #include "SceneGraphWidget.h"
 
-#include "SceneViewWidget.h"
+#include "EditorWindow.h"
 
 #include <Scene.h>
 #include <components/TransformComponent.h>
@@ -31,9 +31,9 @@ namespace NexusEditor
         }
     }
 
-    SceneGraphWidget::SceneGraphWidget(SceneViewWidget* sceneView, QWidget* parent)
+    SceneGraphWidget::SceneGraphWidget(EditorWindow& editorWindow, QWidget* parent)
         : QWidget(parent)
-        , m_sceneView(sceneView)
+        , m_editorWindow(&editorWindow)
     {
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
@@ -51,12 +51,12 @@ namespace NexusEditor
             {
                 static std::uint64_t s_entityCounter = 1;
 
-                if (!m_sceneView || !m_sceneView->IsInitialized())
+                if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
                 {
                     return;
                 }
 
-                NexusEngine::Scene* activeScene = m_sceneView->GetActiveScene();
+                NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
                 if (!activeScene)
                 {
                     return;
@@ -93,13 +93,13 @@ namespace NexusEditor
     {
         m_treeWidget->clear();
 
-        if (!m_sceneView || !m_sceneView->IsInitialized())
+        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
         {
             m_treeWidget->addTopLevelItem(new QTreeWidgetItem(QStringList{ QStringLiteral("Initializing scene...") }));
             return;
         }
 
-        NexusEngine::Engine* engine = m_sceneView->GetEngine();
+        NexusEngine::Engine* engine = m_editorWindow->GetEngine();
         if (!engine)
         {
             m_treeWidget->addTopLevelItem(new QTreeWidgetItem(QStringList{ QStringLiteral("Engine unavailable") }));

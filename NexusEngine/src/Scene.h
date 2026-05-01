@@ -12,10 +12,8 @@
 namespace NexusEngine
 {
     struct CameraComponent;
+    class Engine;
     class RenderResourceFactory;
-
-    // Marker for the input phase in the scene pipeline.
-    struct InputPhase {};
 
     // Marker for the gameplay phase in the scene pipeline.
     struct GameplayPhase {};
@@ -48,8 +46,9 @@ namespace NexusEngine
         /// Creates a scene with its own ECS world and render resource factory.
         /// </summary>
         /// <param name="graphicsRenderer">Renderer used to create scene resources.</param>
+        /// <param name="engine">Owning engine instance.</param>
         /// <param name="name">Initial scene name.</param>
-        Scene(GraphicsRenderer& graphicsRenderer, const std::string& name = "Unnamed");
+        Scene(GraphicsRenderer& graphicsRenderer, Engine& engine, const std::string& name = "Unnamed");
 
         /// <summary>
         /// Releases scene-owned resources.
@@ -98,7 +97,8 @@ namespace NexusEngine
         void RegisterSystems();
         bool EnsureInstanceTransformBufferCapacity(Diligent::Uint32 instanceCount);
 
-        GraphicsRenderer m_graphicsRenderer;
+        GraphicsRenderer* m_graphicsRenderer;
+        Engine* m_engine;
         std::unique_ptr<RenderResourceFactory> m_resourceFactory;
         Diligent::RefCntAutoPtr<Diligent::IBuffer> m_instanceTransformBuffer;
         Diligent::Uint32 m_instanceTransformCapacity = 0;

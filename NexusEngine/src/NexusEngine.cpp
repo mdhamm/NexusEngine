@@ -90,7 +90,7 @@ namespace NexusEngine
 
     Scene& Engine::CreateScene(const std::string& name)
     {
-        auto s = std::make_unique<Scene>(m_graphicsRenderer, name);
+        auto s = std::make_unique<Scene>(m_graphicsRenderer, *this, name);
         Scene& ref = *s;
         m_scenes.push_back(std::move(s));
         return ref;
@@ -132,15 +132,10 @@ namespace NexusEngine
 
     void Engine::Tick(float dt)
     {
-        SDL_Event e{};
-        while (SDL_PollEvent(&e))
+        if (m_inputBackend)
         {
-            if (e.type == SDL_QUIT)
-            {
-                m_shutdown = true;
-            }
-
-            ProcessSDLEvent(e);
+            m_inputBackend->BeginFrame();
+            m_inputBackend->EndFrame();
         }
 
         if (m_activeScene)
@@ -148,83 +143,4 @@ namespace NexusEngine
             m_activeScene->Update(dt);
         }
     }
-
-    // --------------------------------------------------------------
-    // ImGui Management
-    // --------------------------------------------------------------
-
-    //bool Engine::EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport)
-    //{
-    //    if (m_ui.enabled)
-    //        return true;
-    //    if (!m_gfx.m_device || !m_gfx.m_swapchain)
-    //    {
-    //        return false;
-    //    }
-
-    //    m_ui.sdlWindow = sdlWindow;
-
-    //    IMGUI_CHECKVERSION();
-    //    ImGui::CreateContext();
-    //    ImGuiIO& io = ImGui::GetIO();
-    //    if (docking)
-    //        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    //    if (multiViewport)
-    //        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    //    ImGui::StyleColorsDark();
-
-    //    // SDL input backend (rendering happens via Diligent)
-    //    ImGui_ImplSDL2_InitForOther(m_ui.sdlWindow);
-
-    //    // Diligent ImGui renderer
-    //    const auto& scDesc = m_gfx.m_swapchain->GetDesc();
-    //    ImGuiDiligentCreateInfo ci{ m_gfx.device, scDesc };
-    //    m_ui.imguiDiligent = new ImGuiImplDiligent(ci);
-
-    //    m_ui.enabled = true;
-    //    return true;
-    //}
-
-    //void Engine::DisableImGui()
-    //{
-    //    if (!m_ui.enabled)
-    //    {
-    //        return;
-    //    }
-
-    //    if (m_ui.imguiDiligent)
-    //    {
-    //        delete m_ui.imguiDiligent;
-    //        m_ui.imguiDiligent = nullptr;
-    //    }
-
-    //    ImGui_ImplSDL2_Shutdown();
-    //    ImGui::DestroyContext();
-
-    //    m_ui.enabled = false;
-    //}
-
-    void Engine::ProcessSDLEvent(const SDL_Event& e)
-    {
-        //if (m_ui.enabled)
-        //    ImGui_ImplSDL2_ProcessEvent(&e);
-    }
-
-    //void Engine::BeginUiFrame(float /*dt*/)
-    //{
-    //    ImGui_ImplSDL2_NewFrame();
-
-    //    const Diligent::SwapChainDesc& scDesc = m_gfx.m_swapchain->GetDesc();
-    //    m_ui.imguiDiligent->NewFrame(
-    //        static_cast<Uint32>(scDesc.Width),
-    //        static_cast<Uint32>(scDesc.Height),
-    //        scDesc.PreTransform
-    //    );
-    //}
-
-    //void Engine::RenderUi(IDeviceContext* ctx)
-    //{
-    //    m_ui.imguiDiligent->Render(ctx);
-    //}
-    //}
 } // namespace NexusEngine

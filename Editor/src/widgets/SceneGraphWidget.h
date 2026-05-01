@@ -2,6 +2,10 @@
 
 #include <QWidget>
 
+#ifdef emit
+#undef emit
+#endif
+
 #include <cstdint>
 #include <functional>
 
@@ -9,7 +13,7 @@ class QTreeWidget;
 
 namespace NexusEditor
 {
-    class SceneViewWidget;
+    class EditorWindow;
 
     class SceneGraphWidget final : public QWidget
     {
@@ -17,9 +21,9 @@ namespace NexusEditor
         /// <summary>
         /// Creates the scene graph panel for the supplied scene view.
         /// </summary>
-        /// <param name="sceneView">Scene view that owns the engine instance.</param>
+        /// <param name="editorWindow">Editor window that owns the engine instance.</param>
         /// <param name="parent">Optional parent widget.</param>
-        explicit SceneGraphWidget(SceneViewWidget* sceneView, QWidget* parent = nullptr);
+        explicit SceneGraphWidget(EditorWindow& editorWindow, QWidget* parent = nullptr);
 
         /// <summary>
         /// Refreshes the scene graph from the active scene.
@@ -33,7 +37,7 @@ namespace NexusEditor
         void SetSelectionChangedCallback(std::function<void(std::uint64_t)> callback);
 
     private:
-        SceneViewWidget* m_sceneView = nullptr;
+        EditorWindow* m_editorWindow = nullptr;
         QTreeWidget* m_treeWidget = nullptr;
         std::function<void(std::uint64_t)> m_onSelectionChanged;
         std::uint64_t m_selectedEntityId = 0;

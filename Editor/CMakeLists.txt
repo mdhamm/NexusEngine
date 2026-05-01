@@ -43,8 +43,8 @@ else()
     src/main_win32.cpp
     src/AssetFileReference.cpp
     src/AssetFileReference.h
-    src/ContentDrawerWidget.cpp
-    src/ContentDrawerWidget.h
+    src/widgets/ContentDrawerWidget.cpp
+    src/widgets/ContentDrawerWidget.h
     src/EditorProject.h
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
@@ -52,21 +52,27 @@ else()
     src/EditorSceneApp.h
     src/EditorSceneSerializer.cpp
     src/EditorSceneSerializer.h
-    src/EditorWindow.cpp
-    src/EditorWindow.h
-    src/PropertyWidget.cpp
-    src/PropertyWidget.h
-    src/ProjectBrowserWindow.cpp
-    src/ProjectBrowserWindow.h
-    src/SceneGraphWidget.cpp
-    src/SceneGraphWidget.h
-    src/SceneViewWidget.cpp
-    src/SceneViewWidget.h
+    "src/windows/EditorWindow.cpp"
+    "src/windows/EditorWindow.h"
+    src/widgets/PropertyWidget.cpp
+    src/widgets/PropertyWidget.h
+    "src/windows/ProjectBrowserWindow.cpp"
+    "src/windows/ProjectBrowserWindow.h"
+    src/widgets/SceneGraphWidget.cpp
+    src/widgets/SceneGraphWidget.h
+    src/widgets/SceneViewWidget.cpp
+    src/widgets/SceneViewWidget.h
   )
 endif()
 
 add_executable(Editor ${GAME_MAIN})
 target_link_libraries(Editor PRIVATE SampleGame)
+
+target_include_directories(Editor PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/windows
+)
 
 if(BUILD_WEB)
   target_link_libraries(Editor PRIVATE DILIGENT_WEBGPU)

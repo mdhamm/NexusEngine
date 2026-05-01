@@ -12,21 +12,21 @@
 #include <chrono>
 #include <functional>
 
+#include "QtInputBackend.h"
+
 namespace NexusEditor
 {
+    class EditorWindow;
+
     class SceneViewWidget final : public QWidget
     {
     public:
         /// <summary>
         /// Creates the editor scene view and its frame timer.
         /// </summary>
+        /// <param name="editorWindow">Editor window that owns the engine instance.</param>
         /// <param name="parent">Optional parent widget.</param>
-        explicit SceneViewWidget(QWidget* parent = nullptr);
-
-        /// <summary>
-        /// Shuts down the embedded engine session.
-        /// </summary>
-        ~SceneViewWidget() override;
+        explicit SceneViewWidget(EditorWindow& editorWindow, QWidget* parent = nullptr);
 
         /// <summary>
         /// Returns the engine instance hosted by the scene view.
@@ -72,14 +72,21 @@ namespace NexusEditor
         void showEvent(QShowEvent* event) override;
         void resizeEvent(QResizeEvent* event) override;
 
+        void keyPressEvent(QKeyEvent* event) override;
+        void keyReleaseEvent(QKeyEvent* event) override;
+        void mouseMoveEvent(QMouseEvent* event) override;
+        void mousePressEvent(QMouseEvent* event) override;
+        void mouseReleaseEvent(QMouseEvent* event) override;
+        void wheelEvent(QWheelEvent* event) override;
+        void leaveEvent(QEvent* event) override;
+
     private:
-        void EnsureEngineInitialized();
         void TickFrame();
         float ComputeDeltaSeconds();
 
-        NexusEngine::Engine m_engine;
-        bool m_isInitialized = false;
+        EditorWindow* m_editorWindow = nullptr;
         std::chrono::steady_clock::time_point m_previousFrameTime{};
         std::function<void()> m_onSceneReady;
+        bool m_hasEmittedSceneReady = false;
     };
 } // namespace NexusEditor

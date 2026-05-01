@@ -9,6 +9,7 @@
 #endif // _WIN32
 
 #include "Scene.h"
+#include "input/InputState.h"
 #include "rendering/GraphicsRenderer.h"
 
 #define REF(x) (void)(x)
@@ -105,12 +106,16 @@ namespace NexusEngine
         void SetActiveScene(const std::string& name);
 
         /// <summary>
-        /// Forwards SDL events to engine systems that need them.
+        /// Returns the current input state for the frame.
         /// </summary>
-        /// <param name="e">SDL event to process.</param>
-        /* bool EnableImGui(SDL_Window* sdlWindow, bool docking, bool multiViewport);
-        void DisableImGui();*/
-        void ProcessSDLEvent(const SDL_Event& e);
+        /// <returns>Current frame input state.</returns>
+        inline InputState& GetInputState() { return m_inputState; }
+
+        /// <summary>
+        /// Sets the input backend used to populate the input state each frame.
+        /// </summary>
+        /// <param name="backend">Input backend to use for the current game session.</param>
+        inline void SetInputBackend(IInputBackend* backend) { m_inputBackend = backend; }
 
     private:
         void Tick(float dt);
@@ -138,6 +143,11 @@ namespace NexusEngine
 
         // Currently active scene.
         Scene* m_activeScene = nullptr;
+
+        // Current frame's input state
+        InputState m_inputState;
+
+        IInputBackend* m_inputBackend = nullptr;
 
         struct UiState
         {

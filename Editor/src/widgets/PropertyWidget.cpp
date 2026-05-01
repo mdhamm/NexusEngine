@@ -1,6 +1,6 @@
 #include "PropertyWidget.h"
 
-#include "SceneViewWidget.h"
+#include "EditorWindow.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -48,9 +48,9 @@ namespace NexusEditor
         }
     }
 
-    PropertyWidget::PropertyWidget(SceneViewWidget* sceneView, QWidget* parent)
+    PropertyWidget::PropertyWidget(EditorWindow& editorWindow, QWidget* parent)
         : QWidget(parent)
-        , m_sceneView(sceneView)
+        , m_editorWindow(&editorWindow)
     {
         auto* rootLayout = new QVBoxLayout(this);
         rootLayout->setContentsMargins(0, 0, 0, 0);
@@ -68,12 +68,12 @@ namespace NexusEditor
 
         connect(addComponentButton, &QPushButton::clicked, this, [this]()
             {
-                if (!m_sceneView || !m_sceneView->IsInitialized() || m_selectedEntityId == 0)
+                if (!m_editorWindow || !m_editorWindow->IsEngineInitialized() || m_selectedEntityId == 0)
                 {
                     return;
                 }
 
-                NexusEngine::Scene* activeScene = m_sceneView->GetActiveScene();
+                NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
                 if (!activeScene)
                 {
                     return;
@@ -128,13 +128,13 @@ namespace NexusEditor
     {
         ClearLayout(m_contentLayout);
 
-        if (!m_sceneView || !m_sceneView->IsInitialized())
+        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
         {
             m_contentLayout->addWidget(new QLabel(QStringLiteral("Initializing properties..."), this));
             return;
         }
 
-        NexusEngine::Scene* activeScene = m_sceneView->GetActiveScene();
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
         if (!activeScene)
         {
             m_contentLayout->addWidget(new QLabel(QStringLiteral("No active scene"), this));
@@ -231,12 +231,12 @@ namespace NexusEditor
     {
         m_addComponentComboBox->clear();
 
-        if (!m_sceneView || !m_sceneView->IsInitialized() || m_selectedEntityId == 0)
+        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized() || m_selectedEntityId == 0)
         {
             return;
         }
 
-        NexusEngine::Scene* activeScene = m_sceneView->GetActiveScene();
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
         if (!activeScene)
         {
             return;

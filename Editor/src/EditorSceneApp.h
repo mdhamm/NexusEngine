@@ -13,4 +13,5 @@ namespace NexusEditor
         /// <param name="engine">Engine instance used to create the editor scene.</param>
         void OnStartup(NexusEngine::Engine& engine) override;
     };
+
 } // namespace NexusEditor
