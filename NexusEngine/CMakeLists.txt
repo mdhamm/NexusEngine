@@ -7,7 +7,7 @@ file(GLOB_RECURSE NEXUS_ENGINE_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES})
+add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/components/FlyCameraComponent.h")
 
 target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src

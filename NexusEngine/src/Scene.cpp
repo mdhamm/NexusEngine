@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "ComponentReflection.h"
 #include "components/CameraComponent.h"
+#include "components/FlyCameraComponent.h"
 #include "components/RenderMeshComponent.h"
 #include "components/TransformComponent.h"
 #include "rendering/Mesh.h"
@@ -8,10 +9,9 @@
 #include "rendering/RenderResourceFactory.h"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>
-#include <DiligentCore/Graphics/GraphicsEngine/interface/BufferView.h>
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
-
+#include <SDL.h>
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
@@ -33,6 +33,7 @@ namespace NexusEngine
             registry.RegisterDescriptor(TransformComponent::CreateDescriptor());
             registry.RegisterDescriptor(CameraComponent::CreateDescriptor());
             registry.RegisterDescriptor(RenderMeshComponent::CreateDescriptor());
+            registry.RegisterDescriptor(FlyCameraComponent::CreateDescriptor());
 
             s_registered = true;
         }
@@ -195,6 +196,82 @@ namespace NexusEngine
                     const float b = 0.16f + 0.05f * std::sin(m_clearAnimationTime * 0.9f + 2.0f);
 
                     m_graphicsRenderer.BeginFrame(r, g, b, 1.0f);
+                });
+
+        m_world.system<TransformComponent, FlyCameraComponent, CameraComponent>("UpdateFlyCamera")
+            .kind<GameplayPhase>()
+            .iter(
+                [](flecs::iter& it, TransformComponent* transforms, FlyCameraComponent* controllers, CameraComponent*)
+                {
+                    const float dt = static_cast<float>(it.delta_time());
+                    const Uint8* keyboardState = SDL_GetKeyboardState(nullptr);
+                    int mouseDeltaX = 0;
+                    int mouseDeltaY = 0;
+
+#if defined(__EMSCRIPTEN__)
+                    // Use accumulated mouse movement on web
+                    mouseDeltaX = s_accumulatedMouseX;
+                    mouseDeltaY = s_accumulatedMouseY;
+                    s_accumulatedMouseX = 0;
+                    s_accumulatedMouseY = 0;
+#else
+                    SDL_GetRelativeMouseState(&mouseDeltaX, &mouseDeltaY);
+#endif
+
+                    for (auto i : it)
+                    {
+                        flecs::entity entity = it.entity(i);
+
+                        auto& transform = transforms[i];
+                        auto& controller = controllers[i];
+
+                        if (!controller.m_isRotationInitialized)
+                        {
+                            const Diligent::float3 initialEuler = Quaternion::ToEuler(transform.GetWorldRotation());
+                            controller.m_pitch = initialEuler.x;
+                            controller.m_yaw = initialEuler.y;
+                            controller.m_isRotationInitialized = true;
+                        }
+
+                        const float deltaYaw = -static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
+                        const float deltaPitch = -static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
+                        constexpr float MaxPitch = Diligent::PI_F * 0.5f - 0.01f;
+
+                        controller.m_yaw += deltaYaw;
+                        controller.m_pitch = std::clamp(controller.m_pitch + deltaPitch, -MaxPitch, MaxPitch);
+
+                        Quaternion worldRotation = Quaternion::FromEuler(0.0f, controller.m_yaw, 0.0f);
+                        worldRotation = Quaternion::Multiply(worldRotation, Quaternion::FromEuler(controller.m_pitch, 0.0f, 0.0f));
+
+                        const Diligent::float3 forward = Quaternion::Foward(worldRotation);
+                        const Diligent::float3 right = Quaternion::Right(worldRotation);
+
+                        SetWorldRotation(entity, worldRotation);
+
+                        Diligent::float3 movement(0.0f, 0.0f, 0.0f);
+                        if (keyboardState[SDL_SCANCODE_W])
+                        {
+                            movement += forward;
+                        }
+                        if (keyboardState[SDL_SCANCODE_S])
+                        {
+                            movement -= forward;
+                        }
+                        if (keyboardState[SDL_SCANCODE_D])
+                        {
+                            movement += right;
+                        }
+                        if (keyboardState[SDL_SCANCODE_A])
+                        {
+                            movement -= right;
+                        }
+
+                        if (Diligent::length(movement) > 0.0f)
+                        {
+                            movement = Diligent::normalize(movement) * (controller.m_moveSpeed * dt);
+                            SetWorldPosition(entity, transform.GetWorldPosition() + movement);
+                        }
+                    }
                 });
 
         m_world.system<CameraComponent>("RenderScene")

@@ -3,6 +3,7 @@
 #include <ComponentReflection.h>
 #include <Scene.h>
 #include <components/CameraComponent.h>
+#include <components/FlyCameraComponent.h>
 #include <components/TransformComponent.h>
 #include <components/RenderMeshComponent.h>
 #include <rendering/RenderResourceFactory.h>
@@ -109,7 +110,6 @@ namespace SampleGame
 
             auto& registry = NexusEngine::ComponentReflectionRegistry::Instance();
 
-            registry.RegisterDescriptor(FlyCameraControllerComponent::CreateDescriptor());
             registry.RegisterDescriptor(RotationSpeed::CreateDescriptor());
 
             s_registered = true;
@@ -128,11 +128,6 @@ namespace SampleGame
             auto& w = scene.m_world;
 
             // Register components
-            w.component<FlyCameraControllerComponent>()
-                .member<float>("moveSpeed")
-                .member<float>("lookSensitivity")
-                .member<float>("yaw")
-                .member<float>("pitch");
             w.component<RotationSpeed>().member<float>("x").member<float>("y").member<float>("z");
 
 #if !defined(__EMSCRIPTEN__)
@@ -146,7 +141,7 @@ namespace SampleGame
                     Diligent::float3(0.0f, 0.0f, 18.0f),
                     NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
                     Diligent::float3(1.0f, 1.0f, 1.0f)))
-                .set(FlyCameraControllerComponent{});
+                .set(NexusEngine::FlyCameraComponent{});
 
             // Create rendering resources using the factory
             auto* factory = scene.GetResourceFactory();
@@ -274,82 +269,6 @@ namespace SampleGame
                     return EM_TRUE;
                 });
 #endif
-
-            w.system<NexusEngine::TransformComponent, FlyCameraControllerComponent, NexusEngine::CameraComponent>("UpdateFlyCamera")
-                .kind(flecs::OnUpdate)
-                .iter(
-                    [](flecs::iter& it, NexusEngine::TransformComponent* transforms, FlyCameraControllerComponent* controllers, NexusEngine::CameraComponent*)
-                    {
-                        const float dt = static_cast<float>(it.delta_time());
-                        const Uint8* keyboardState = SDL_GetKeyboardState(nullptr);
-                        int mouseDeltaX = 0;
-                        int mouseDeltaY = 0;
-
-#if defined(__EMSCRIPTEN__)
-                        // Use accumulated mouse movement on web
-                        mouseDeltaX = s_accumulatedMouseX;
-                        mouseDeltaY = s_accumulatedMouseY;
-                        s_accumulatedMouseX = 0;
-                        s_accumulatedMouseY = 0;
-#else
-                        SDL_GetRelativeMouseState(&mouseDeltaX, &mouseDeltaY);
-#endif
-
-                        for (auto i : it)
-                        {
-                            flecs::entity entity = it.entity(i);
-
-                            auto& transform = transforms[i];
-                            auto& controller = controllers[i];
-
-                            if (!controller.m_isRotationInitialized)
-                            {
-                                const Diligent::float3 initialEuler = NexusEngine::Quaternion::ToEuler(transform.GetWorldRotation());
-                                controller.m_pitch = initialEuler.x;
-                                controller.m_yaw = initialEuler.y;
-                                controller.m_isRotationInitialized = true;
-                            }
-
-                            const float deltaYaw = -static_cast<float>(mouseDeltaX) * controller.m_lookSensitivity;
-                            const float deltaPitch = -static_cast<float>(mouseDeltaY) * controller.m_lookSensitivity;
-                            constexpr float MaxPitch = Diligent::PI_F * 0.5f - 0.01f;
-
-                            controller.m_yaw += deltaYaw;
-                            controller.m_pitch = std::clamp(controller.m_pitch + deltaPitch, -MaxPitch, MaxPitch);
-
-                            NexusEngine::Quaternion worldRotation = NexusEngine::Quaternion::FromEuler(0.0f, controller.m_yaw, 0.0f);
-                            worldRotation = NexusEngine::Quaternion::Multiply(worldRotation, NexusEngine::Quaternion::FromEuler(controller.m_pitch, 0.0f, 0.0f));
-
-                            const Diligent::float3 forward = NexusEngine::Quaternion::Foward(worldRotation);
-                            const Diligent::float3 right = NexusEngine::Quaternion::Right(worldRotation);
-
-                            NexusEngine::SetWorldRotation(entity, worldRotation);
-
-                            Diligent::float3 movement(0.0f, 0.0f, 0.0f);
-                            if (keyboardState[SDL_SCANCODE_W])
-                            {
-                                movement += forward;
-                            }
-                            if (keyboardState[SDL_SCANCODE_S])
-                            {
-                                movement -= forward;
-                            }
-                            if (keyboardState[SDL_SCANCODE_D])
-                            {
-                                movement += right;
-                            }
-                            if (keyboardState[SDL_SCANCODE_A])
-                            {
-                                movement -= right;
-                            }
-
-                            if (Diligent::length(movement) > 0.0f)
-                            {
-                                movement = Diligent::normalize(movement) * (controller.m_moveSpeed * dt);
-                                NexusEngine::SetWorldPosition(entity, transform.GetWorldPosition() + movement);
-                            }
-                        }
-                    });
 
             // System to rotate objects with RotationSpeed component
             w.system<NexusEngine::TransformComponent, RotationSpeed>("RotateObjects")
