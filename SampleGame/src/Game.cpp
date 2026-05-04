@@ -1,14 +1,13 @@
 #include "Game.h"
 #include "GameComponents.h"
-#include <MetadataRegistry.h>
 #include <Scene.h>
 #include <components/CameraComponent.h>
 #include <components/FlyCameraComponent.h>
 #include <components/TransformComponent.h>
 #include <components/RenderMeshComponent.h>
+#include <reflection/EntityReflection.h>
 #include <rendering/RenderResourceFactory.h>
 #include <SDL.h>
-#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "MetadataRegistry.h"
 #include "RenderTextureComponent.h"
+#include "reflection/EntityReflection.h"
 
 namespace NexusEngine
 {

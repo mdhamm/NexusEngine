@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MetadataRegistry.h"
+#include "EntityReflection.h"
 
 #include <functional>
 #include <optional>

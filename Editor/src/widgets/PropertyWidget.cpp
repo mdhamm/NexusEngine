@@ -20,10 +20,10 @@
 #undef emit
 #endif
 
-#include <ComponentAccess.h>
-#include <MetadataRegistry.h>
 #include <Scene.h>
 #include <components/EditorOnlyComponent.h>
+#include <reflection/EntityReflection.h>
+#include <reflection/MetadataHelpers.h>
 
 #include <algorithm>
 #include <cstdint>

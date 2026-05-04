@@ -1,8 +1,8 @@
 #include "EditorSceneSerializer.h"
 
-#include <io/AssetGuid.h>
-#include <io/FileIO.h>
-#include <io/SceneIO.h>
+#include <filesystem/AssetGuid.h>
+#include <filesystem/FileIO.h>
+#include <filesystem/SceneIO.h>
 #include <serialization/JsonSerializer.h>
 
 #include <nlohmann/json.hpp>

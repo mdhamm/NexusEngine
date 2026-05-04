@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cmath>
 
-#include "MetadataRegistry.h"
+#include "reflection/EntityReflection.h"
 
 #include <flecs.h>
 #include <DiligentCore/Common/interface/BasicMath.hpp>

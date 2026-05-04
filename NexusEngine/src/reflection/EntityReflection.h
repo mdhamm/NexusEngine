@@ -2,7 +2,6 @@
 
 #include <flecs.h>
 
-#include <cstddef>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -23,7 +22,6 @@ namespace NexusEngine
 
     using TypeId = std::type_index;
 
-    // TODO: move this to a separate header and rename to AssetReferenceComponent or something like that
     struct AssetReference
     {
         std::string m_guid;
@@ -38,21 +36,11 @@ namespace NexusEngine
         std::optional<AssetType> m_assetType;
         std::unordered_map<std::string, int> m_namedValues;
 
-        /// <summary>
-        /// Returns a mutable pointer to the field inside a component instance.
-        /// </summary>
-        /// <param name="componentData">Component instance address.</param>
-        /// <returns>Pointer to the field storage.</returns>
         void* GetPointer(void* componentData) const
         {
             return static_cast<void*>(static_cast<char*>(componentData) + m_offset);
         }
 
-        /// <summary>
-        /// Returns a read-only pointer to the field inside a component instance.
-        /// </summary>
-        /// <param name="componentData">Component instance address.</param>
-        /// <returns>Pointer to the field storage.</returns>
         const void* GetPointer(const void* componentData) const
         {
             return static_cast<const void*>(static_cast<const char*>(componentData) + m_offset);
@@ -124,18 +112,8 @@ namespace NexusEngine
         class FieldBuilder;
         class ComponentBuilder;
 
-        /// <summary>
-        /// Returns the shared metadata registry instance.
-        /// </summary>
-        /// <returns>The shared metadata registry.</returns>
         static MetadataRegistry& Instance();
 
-        /// <summary>
-        /// Starts metadata registration for a component type.
-        /// </summary>
-        /// <typeparam name="T">Component type to register.</typeparam>
-        /// <param name="name">Component display name.</param>
-        /// <returns>A builder used to register component fields.</returns>
         template<typename T>
         ComponentBuilder component(std::string name)
         {
@@ -146,11 +124,6 @@ namespace NexusEngine
             return ComponentBuilder(metadata);
         }
 
-        /// <summary>
-        /// Returns metadata for a component type.
-        /// </summary>
-        /// <typeparam name="T">Component type to query.</typeparam>
-        /// <returns>The component metadata, or null when unregistered.</returns>
         template<typename T>
         const ComponentMetadata* Get() const
         {
@@ -158,18 +131,7 @@ namespace NexusEngine
             return it != m_components.end() ? &it->second : nullptr;
         }
 
-        /// <summary>
-        /// Returns metadata for a component type id.
-        /// </summary>
-        /// <param name="type">Component type id to query.</param>
-        /// <returns>The component metadata, or null when unregistered.</returns>
         const ComponentMetadata* Get(TypeId type) const;
-
-        /// <summary>
-        /// Returns metadata for a component name.
-        /// </summary>
-        /// <param name="name">Component name to query.</param>
-        /// <returns>The component metadata, or null when unregistered.</returns>
         const ComponentMetadata* FindByName(const std::string& name) const;
 
         const std::unordered_map<TypeId, ComponentMetadata>& GetAll() const
@@ -236,11 +198,6 @@ namespace NexusEngine
         {
         }
 
-        /// <summary>
-        /// Tags a field as referencing a specific asset category.
-        /// </summary>
-        /// <param name="assetType">Semantic asset type of the field.</param>
-        /// <returns>The current field builder.</returns>
         FieldBuilder& assetType(AssetType assetType)
         {
             m_metadata->m_assetType = assetType;
@@ -268,14 +225,6 @@ namespace NexusEngine
         {
         }
 
-        /// <summary>
-        /// Registers metadata for a component field.
-        /// </summary>
-        /// <typeparam name="T">Component type that owns the field.</typeparam>
-        /// <typeparam name="TField">Field type.</typeparam>
-        /// <param name="name">Field name.</param>
-        /// <param name="fieldPointer">Pointer-to-member identifying the field.</param>
-        /// <returns>A field builder for additional semantic tags.</returns>
         template<typename T, typename TField>
         class FieldRegistration
         {
@@ -346,12 +295,6 @@ namespace NexusEngine
     template<typename T>
     struct ComponentMeta;
 
-    /// <summary>
-    /// Registers a component with Flecs and the semantic metadata registry.
-    /// </summary>
-    /// <typeparam name="T">Component type to register.</typeparam>
-    /// <param name="world">World receiving Flecs meta registration.</param>
-    /// <param name="registry">Semantic metadata registry.</param>
     template<typename T>
     void RegisterComponent(flecs::world& world, MetadataRegistry& registry)
     {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <MetadataRegistry.h>
+#include <reflection/EntityReflection.h>
 
 namespace SampleGame
 {

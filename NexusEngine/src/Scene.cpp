@@ -1,12 +1,11 @@
 #include "Scene.h"
 
-#include "ComponentAccess.h"
-#include "MetadataRegistry.h"
 #include "components/CameraComponent.h"
 #include "components/EditorOnlyComponent.h"
 #include "components/FlyCameraComponent.h"
 #include "components/RenderMeshComponent.h"
 #include "components/TransformComponent.h"
+#include "reflection/EntityReflection.h"
 #include "rendering/Mesh.h"
 #include "rendering/Material.h"
 #include "rendering/RenderResourceFactory.h"
@@ -17,7 +16,6 @@
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 #include <SDL.h>
 #include <cmath>
-#include <cstdint>
 #include <cstring>
 #include <NexusEngine.cpp>
 

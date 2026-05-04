@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MetadataRegistry.h"
+#include "reflection/EntityReflection.h"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>

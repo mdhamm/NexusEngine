@@ -1,6 +1,6 @@
 #include "EntitySerialization.h"
-#include "ComponentAccess.h"
 #include "ISerializer.h"
+#include "reflection/MetadataHelpers.h"
 
 #include <algorithm>
 #include <optional>

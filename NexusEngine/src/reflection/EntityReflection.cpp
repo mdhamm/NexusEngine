@@ -1,4 +1,4 @@
-#include "MetadataRegistry.h"
+#include "EntityReflection.h"
 
 namespace NexusEngine
 {
