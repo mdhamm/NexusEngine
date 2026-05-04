@@ -7,10 +7,22 @@
 #include <optional>
 #include <vector>
 
+namespace NexusEngine
+{
+    class ISerializeReader;
+    class ISerializeWriter;
+}
+
 namespace NexusEngine::IO
 {
-    using SerializeToBytesMethod = std::function<bool(std::vector<std::uint8_t>& bytes)>;
-    using DeserializeFromBytesMethod = std::function<bool(const std::vector<std::uint8_t>& bytes)>;
+    enum class FileFormat
+    {
+        Json,
+        Binary,
+    };
+
+    using StructuredWriteMethod = std::function<bool(ISerializeWriter& writer)>;
+    using StructuredReadMethod = std::function<bool(ISerializeReader& reader)>;
 
     /// <summary>
     /// Reads an entire file as raw bytes.
@@ -37,18 +49,20 @@ namespace NexusEngine::IO
     bool WriteFileBytes(const std::filesystem::path& filePath, const std::vector<std::uint8_t>& bytes);
 
     /// <summary>
-    /// Serializes data into bytes and writes the result to a file.
+    /// Writes structured data to a file using the requested file format.
     /// </summary>
     /// <param name="filePath">Destination file path.</param>
-    /// <param name="serializeMethod">Callback that fills the output byte buffer.</param>
+    /// <param name="fileFormat">Structured file format to write.</param>
+    /// <param name="writeMethod">Method that writes structured data to the provided serializer.</param>
     /// <returns>True if serialization and file writing succeeded; otherwise false.</returns>
-    bool WriteSerializedFile(const std::filesystem::path& filePath, const SerializeToBytesMethod& serializeMethod);
+    bool WriteStructuredFile(const std::filesystem::path& filePath, FileFormat fileFormat, const StructuredWriteMethod& writeMethod);
 
     /// <summary>
-    /// Reads file bytes and passes them to a caller-provided deserializer.
+    /// Reads structured data from a file using the requested file format.
     /// </summary>
     /// <param name="filePath">Source file path.</param>
-    /// <param name="deserializeMethod">Callback that consumes the file bytes.</param>
+    /// <param name="fileFormat">Structured file format to read.</param>
+    /// <param name="readMethod">Method that reads structured data from the provided serializer.</param>
     /// <returns>True if file reading and deserialization succeeded; otherwise false.</returns>
-    bool ReadSerializedFile(const std::filesystem::path& filePath, const DeserializeFromBytesMethod& deserializeMethod);
+    bool ReadStructuredFile(const std::filesystem::path& filePath, FileFormat fileFormat, const StructuredReadMethod& readMethod);
 } // namespace NexusEngine::IO

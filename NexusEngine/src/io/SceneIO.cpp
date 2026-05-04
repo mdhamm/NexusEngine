@@ -1,44 +1,30 @@
 #include "SceneIO.h"
 
 #include "FileIO.h"
+#include "serialization/SceneSerialization.h"
 
 namespace NexusEngine::IO
 {
-    bool SaveSceneToFile(
-        const Scene& scene,
-        const std::filesystem::path& filePath,
-        const SerializeSceneMethod& serializeMethod,
-        const CreateSceneWriterMethod& createWriter)
+    bool SaveSceneToFile(const Scene& scene, const std::filesystem::path& filePath, FileFormat fileFormat)
     {
-        if (!serializeMethod || !createWriter)
-        {
-            return false;
-        }
-
-        return WriteSerializedFile(
+        return WriteStructuredFile(
             filePath,
-            [&](std::vector<std::uint8_t>& bytes)
+            fileFormat,
+            [&](ISerializeWriter& writer)
             {
-                return createWriter(bytes, scene, serializeMethod);
+                SerializeScene(scene, writer);
+                return true;
             });
     }
 
-    bool LoadSceneFromFile(
-        Scene& scene,
-        const std::filesystem::path& filePath,
-        const DeserializeSceneMethod& deserializeMethod,
-        const CreateSceneReaderMethod& createReader)
+    bool LoadSceneFromFile(Scene& scene, const std::filesystem::path& filePath, FileFormat fileFormat)
     {
-        if (!deserializeMethod || !createReader)
-        {
-            return false;
-        }
-
-        return ReadSerializedFile(
+        return ReadStructuredFile(
             filePath,
-            [&](const std::vector<std::uint8_t>& bytes)
+            fileFormat,
+            [&](ISerializeReader& reader)
             {
-                return createReader(bytes, scene, deserializeMethod);
+                return DeserializeScene(scene, reader);
             });
     }
 } // namespace NexusEngine::IO

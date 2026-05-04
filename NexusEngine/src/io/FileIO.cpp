@@ -1,9 +1,97 @@
 #include "FileIO.h"
 
+#include "serialization/BinarySerializer.h"
+#include "serialization/JsonSerializer.h"
+
+#include <nlohmann/json.hpp>
+
 #include <fstream>
+#include <sstream>
+#include <unordered_map>
 
 namespace NexusEngine::IO
 {
+    namespace
+    {
+        using json = nlohmann::json;
+
+        bool WriteJsonFile(const std::filesystem::path& filePath, const StructuredWriteMethod& writeMethod)
+        {
+            json document;
+            JsonSerializeWriter writer(document);
+            writer.BeginObject();
+            if (!writeMethod(writer))
+            {
+                return false;
+            }
+
+            const std::string text = document.dump(4) + '\n';
+            return WriteFileBytes(
+                filePath,
+                reinterpret_cast<const std::uint8_t*>(text.data()),
+                text.size());
+        }
+
+        bool ReadJsonFile(const std::filesystem::path& filePath, const StructuredReadMethod& readMethod)
+        {
+            const std::optional<std::vector<std::uint8_t>> bytes = ReadFileBytes(filePath);
+            if (!bytes)
+            {
+                return false;
+            }
+
+            json document;
+            try
+            {
+                document = json::parse(bytes->begin(), bytes->end());
+            }
+            catch (...)
+            {
+                return false;
+            }
+
+            if (!document.is_object())
+            {
+                return false;
+            }
+
+            JsonSerializeReader reader(document);
+            return readMethod(reader);
+        }
+
+        bool WriteBinaryFile(const std::filesystem::path& filePath, const StructuredWriteMethod& writeMethod)
+        {
+            std::ostringstream stream(std::ios::binary);
+            BinarySerializeWriter writer(stream);
+            writer.BeginObject();
+            if (!writeMethod(writer))
+            {
+                return false;
+            }
+
+            const std::string bytes = stream.str();
+            return WriteFileBytes(
+                filePath,
+                reinterpret_cast<const std::uint8_t*>(bytes.data()),
+                bytes.size());
+        }
+
+        bool ReadBinaryFile(const std::filesystem::path& filePath, const StructuredReadMethod& readMethod)
+        {
+            const std::optional<std::vector<std::uint8_t>> bytes = ReadFileBytes(filePath);
+            if (!bytes)
+            {
+                return false;
+            }
+
+            const std::string buffer(bytes->begin(), bytes->end());
+            std::istringstream stream(buffer, std::ios::binary);
+            BinarySerializeReader reader(stream);
+            reader.BeginObject();
+            return readMethod(reader);
+        }
+    }
+
     std::optional<std::vector<std::uint8_t>> ReadFileBytes(const std::filesystem::path& filePath)
     {
         std::ifstream stream(filePath, std::ios::binary);
@@ -65,35 +153,47 @@ namespace NexusEngine::IO
         return WriteFileBytes(filePath, bytes.data(), bytes.size());
     }
 
-    bool WriteSerializedFile(const std::filesystem::path& filePath, const SerializeToBytesMethod& serializeMethod)
+    bool WriteStructuredFile(const std::filesystem::path& filePath, FileFormat fileFormat, const StructuredWriteMethod& writeMethod)
     {
-        if (!serializeMethod)
+        if (!writeMethod)
         {
             return false;
         }
 
-        std::vector<std::uint8_t> bytes;
-        if (!serializeMethod(bytes))
+        static const std::unordered_map<FileFormat, bool(*)(const std::filesystem::path&, const StructuredWriteMethod&)> handlers =
+        {
+            { FileFormat::Json, &WriteJsonFile },
+            { FileFormat::Binary, &WriteBinaryFile },
+        };
+
+        const auto it = handlers.find(fileFormat);
+        if (it == handlers.end())
         {
             return false;
         }
 
-        return WriteFileBytes(filePath, bytes);
+        return it->second(filePath, writeMethod);
     }
 
-    bool ReadSerializedFile(const std::filesystem::path& filePath, const DeserializeFromBytesMethod& deserializeMethod)
+    bool ReadStructuredFile(const std::filesystem::path& filePath, FileFormat fileFormat, const StructuredReadMethod& readMethod)
     {
-        if (!deserializeMethod)
+        if (!readMethod)
         {
             return false;
         }
 
-        const std::optional<std::vector<std::uint8_t>> bytes = ReadFileBytes(filePath);
-        if (!bytes)
+        static const std::unordered_map<FileFormat, bool(*)(const std::filesystem::path&, const StructuredReadMethod&)> handlers =
+        {
+            { FileFormat::Json, &ReadJsonFile },
+            { FileFormat::Binary, &ReadBinaryFile },
+        };
+
+        const auto it = handlers.find(fileFormat);
+        if (it == handlers.end())
         {
             return false;
         }
 
-        return deserializeMethod(*bytes);
+        return it->second(filePath, readMethod);
     }
 } // namespace NexusEngine::IO

@@ -142,7 +142,25 @@ namespace NexusEngine
         ReadRaw(value);
     }
 
-    void BinarySerializeReader::Read(std::string_view name, int& value)
+    void BinarySerializeReader::Read(std::string_view name, int32_t& value)
+    {
+        ReadAndDiscardName(name);
+        ReadRaw(value);
+    }
+
+    void BinarySerializeReader::Read(std::string_view name, uint32_t& value)
+    {
+        ReadAndDiscardName(name);
+        ReadRaw(value);
+    }
+
+    void BinarySerializeReader::Read(std::string_view name, int64_t& value)
+    {
+        ReadAndDiscardName(name);
+        ReadRaw(value);
+    }
+
+    void BinarySerializeReader::Read(std::string_view name, uint64_t& value)
     {
         ReadAndDiscardName(name);
         ReadRaw(value);

@@ -49,10 +49,13 @@ namespace NexusEngine
         size_t GetArraySize(std::string_view name) const override;
         void BeginArrayElement(size_t index) override;
         void EndArrayElement() override;
-        std::vector<std::string> GetObjectKeys() const;
+        std::vector<std::string> GetObjectKeys() const override;
         void Read(std::string_view name, float& value) override;
         void Read(std::string_view name, bool& value) override;
-        void Read(std::string_view name, int& value) override;
+        void Read(std::string_view name, int32_t& value) override;
+        void Read(std::string_view name, uint32_t& value) override;
+        void Read(std::string_view name, int64_t& value) override;
+        void Read(std::string_view name, uint64_t& value) override;
         void Read(std::string_view name, std::string& value) override;
 
     private:
