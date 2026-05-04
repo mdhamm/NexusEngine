@@ -22,15 +22,6 @@ namespace NexusEditor
     bool SaveSceneToFile(const NexusEngine::Scene& scene, const QString& filePath);
 
     /// <summary>
-    /// Saves a scene to a file using a stable asset guid.
-    /// </summary>
-    /// <param name="scene">Scene to save.</param>
-    /// <param name="filePath">Destination file path.</param>
-    /// <param name="assetGuid">Stable guid stored with the asset.</param>
-    /// <returns>True if the scene was saved; otherwise false.</returns>
-    bool SaveSceneToFile(const NexusEngine::Scene& scene, const QString& filePath, const QString& assetGuid);
-
-    /// <summary>
     /// Loads a scene from a file using reflected component properties.
     /// </summary>
     /// <param name="scene">Scene to populate from disk.</param>

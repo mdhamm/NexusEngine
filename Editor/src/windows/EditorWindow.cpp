@@ -81,7 +81,7 @@ namespace NexusEditor
         }
 
         NexusEngine::Scene* activeScene = const_cast<NexusEngine::Engine&>(m_engine).ActiveScene();
-        return activeScene ? SaveSceneToFile(*activeScene, filePath, assetGuid) : false;
+        return activeScene ? SaveSceneToFile(*activeScene, filePath) : false;
     }
 
     bool EditorWindow::LoadScene(const QString& filePath)

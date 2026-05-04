@@ -1,84 +1,36 @@
 #pragma once
 
-#include "ISerializer.h"
 #include "MetadataRegistry.h"
-#include "Scene.h"
-// TODO: move to cpp
+
+#include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace NexusEngine
 {
-    void SerializeField(const FieldMetadata& fieldMeta, const void* data, ISerializer& s)
+    class ISerializeReader;
+    class ISerializeWriter;
+
+    struct SerializedEntityHeader
     {
-        if (fieldMeta.runtimeType == GetTypeId<float>())
-        {
-            s.Write(fieldMeta.name, *static_cast<const float*>(data));
-        }
-        else if (fieldMeta.runtimeType == GetTypeId<bool>())
-        {
-            s.Write(fieldMeta.name, *static_cast<const bool*>(data));
-        }
-        else if (fieldMeta.runtimeType == GetTypeId<int>())
-        {
-            s.Write(fieldMeta.name, *static_cast<const int*>(data));
-        }
-        else if (fieldMeta.runtimeType == GetTypeId<std::string>())
-        {
-            s.Write(fieldMeta.name, *static_cast<const std::string*>(data));
-        }
-        else if (fieldMeta.runtimeType == GetTypeId<AssetReference>())
-        {
-            const auto& ref = *static_cast<const AssetReference*>(data);
-            s.Write(fieldMeta.name, ref.m_guid);
-        }
-    }
+        std::uint64_t m_id = 0;
+        std::string m_name;
+        std::uint64_t m_parentId = 0;
+    };
 
-    void SerializeComponent(const ComponentMetadata& component, ISerializer& s)
-    {
-        const ComponentMetadata& meta = component.meta;
+    bool HasObjectKey(const ISerializeReader& reader, std::string_view name);
 
-        s.BeginObject(meta.name);
+    void SerializeField(const FieldView& field, ISerializeWriter& writer);
 
-        for (const FieldMetadata& field : meta.fields)
-        {
-            const void* fieldPtr =
-                static_cast<const char*>(component.data) + field.offset;
+    void SerializeComponent(const ComponentMetadata& metadata, const flecs::entity& entity, ISerializeWriter& writer);
 
-            SerializeField(field, fieldPtr, s);
-        }
+    void SerializeEntity(const flecs::entity& entity, ISerializeWriter& writer);
 
-        s.EndObject();
-    }
+    bool DeserializeField(std::string& fieldName, std::string& fieldValue, ISerializeReader& reader);
 
-    void SerializeEntity(flecs::entity e, ISerializeWriter& writer)
-    {
-        writer.BeginObject();
+    bool DeserializeEntityHeader(SerializedEntityHeader& header, ISerializeReader& reader);
 
-        writer.Write("id", e.id());
-        writer.Write("name", scene.GetName(e));
+    bool DeserializeComponent(const flecs::entity& entity, ISerializeReader& reader);
 
-        const std::uint64_t parentId =
-            entity.parent().is_valid()
-            ? static_cast<std::uint64_t>(entity.parent().id())
-            : 0;
-
-        writer.Write("parentId", parentId);
-
-        writer.BeginArray("components");
-
-        for (const auto& [type, metadata] : MetadataRegistry::Instance().GetAll())
-        {
-            (void)type;
-
-            if (!metadata.m_hasComponent || !metadata.m_hasComponent(entity))
-            {
-                continue;
-            }
-
-            SerializeComponent(metadata, entity, writer);
-        }
-
-        writer.EndArray(); // components
-
-        writer.EndObject(); // entity
-    }
+    bool DeserializeEntity(const flecs::entity& entity, ISerializeReader& reader);
 } // namespace NexusEngine

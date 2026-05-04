@@ -249,8 +249,9 @@ namespace NexusEditor
                 *componentView,
                 [&](const NexusEngine::FieldView& field)
                 {
+                    const std::string fieldName = field.m_meta ? field.m_meta->m_name : std::string{};
                     signature += QStringLiteral("|property:%1:%2:%3:%4")
-                        .arg(QString::fromStdString(std::string(field.m_name)))
+                        .arg(QString::fromStdString(fieldName))
                         .arg(GetInspectorFieldTypeLabel(field))
                         .arg(static_cast<int>(NexusEngine::GetFieldValueKind(field)))
                         .arg(NexusEngine::IsFieldReadOnly(field) ? 1 : 0);
@@ -407,7 +408,8 @@ namespace NexusEditor
                 *componentView,
                 [this, &metadata](const NexusEngine::FieldView& field)
                 {
-                    const QString objectName = MakePropertyControlObjectName(metadata.m_name, std::string(field.m_name));
+                    const std::string fieldName = field.m_meta ? field.m_meta->m_name : std::string{};
+                    const QString objectName = MakePropertyControlObjectName(metadata.m_name, fieldName);
                     const bool isReadOnly = NexusEngine::IsFieldReadOnly(field);
                     if (NexusEngine::GetFieldValueKind(field) == NexusEngine::FieldValueKind::Bool)
                     {
@@ -505,7 +507,7 @@ namespace NexusEditor
                 *componentView,
                 [groupBox, formLayout, entity, &metadata](const NexusEngine::FieldView& field)
                 {
-                    const std::string fieldName(field.m_name);
+                    const std::string fieldName = field.m_meta ? field.m_meta->m_name : std::string{};
                     const QString labelText = QStringLiteral("%1 (%2)")
                         .arg(QString::fromStdString(fieldName), GetInspectorFieldTypeLabel(field));
                     const bool isReadOnly = NexusEngine::IsFieldReadOnly(field);

@@ -47,7 +47,6 @@ namespace NexusEngine
         }
 
         ComponentView view;
-        view.m_type = type;
         view.m_data = componentData;
         view.m_meta = metadata;
         return view;
@@ -79,8 +78,6 @@ namespace NexusEngine
         for (const FieldMetadata& fieldMetadata : component.m_meta->m_fields)
         {
             FieldView fieldView;
-            fieldView.m_name = fieldMetadata.m_name;
-            fieldView.m_type = fieldMetadata.m_type;
             fieldView.m_data = fieldMetadata.GetPointer(component.m_data);
             fieldView.m_meta = &fieldMetadata;
             visitor(fieldView);
@@ -94,7 +91,7 @@ namespace NexusEngine
             component,
             [&](const FieldView& field)
             {
-                if (!result && field.m_name == fieldName)
+                if (!result && field.m_meta && field.m_meta->m_name == fieldName)
                 {
                     result = field;
                 }
@@ -114,22 +111,22 @@ namespace NexusEngine
             return FieldValueKind::NamedValue;
         }
 
-        if (field.m_type == std::type_index(typeid(bool)))
+        if (field.m_meta->m_type == std::type_index(typeid(bool)))
         {
             return FieldValueKind::Bool;
         }
 
-        if (field.m_type == std::type_index(typeid(int)))
+        if (field.m_meta->m_type == std::type_index(typeid(int)))
         {
             return FieldValueKind::Int;
         }
 
-        if (field.m_type == std::type_index(typeid(float)))
+        if (field.m_meta->m_type == std::type_index(typeid(float)))
         {
             return FieldValueKind::Float;
         }
 
-        if (field.m_type == std::type_index(typeid(std::string)))
+        if (field.m_meta->m_type == std::type_index(typeid(std::string)))
         {
             return field.m_meta->m_assetType.has_value()
                 ? FieldValueKind::AssetReference

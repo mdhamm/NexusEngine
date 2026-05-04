@@ -1,197 +1,79 @@
 #pragma once
 
 #include "ISerializer.h"
-#include <nlohmann/json.hpp>
 
+#include <nlohmann/json_fwd.hpp>
+
+#include <cstddef>
+#include <cstdint>
 #include <stack>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <cstddef>
-// TODO: move to cpp
+
 namespace NexusEngine
 {
-    class JsonSerializeReader final : public ISerializeReader {
+    class JsonSerializeWriter final : public ISerializeWriter
+    {
     public:
-        explicit JsonSerializeReader(const nlohmann::json& root)
-            : m_root(root), m_current(&root)
-        {
-        }
+        explicit JsonSerializeWriter(nlohmann::json& root);
 
-        void BeginObject(std::string_view name = {}) override {
-            const nlohmann::json& obj = GetChild(name);
-            m_stack.push(m_current);
-            m_current = &obj;
-        }
-
-        void EndObject() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        void BeginArray(std::string_view name = {}) override {
-            const nlohmann::json& arr = GetChild(name);
-            m_stack.push(m_current);
-            m_current = &arr;
-        }
-
-        void EndArray() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        size_t GetArraySize(std::string_view name) const override {
-            const nlohmann::json& arr = name.empty()
-                ? *m_current
-                : m_current->at(std::string(name));
-
-            return arr.size();
-        }
-
-        void BeginArrayElement(size_t index) override {
-            m_stack.push(m_current);
-            m_current = &m_current->at(index);
-        }
-
-        void EndArrayElement() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        std::vector<std::string> GetObjectKeys() const override {
-            std::vector<std::string> keys;
-
-            if (!m_current->is_object())
-                return keys;
-
-            for (auto it = m_current->begin(); it != m_current->end(); ++it) {
-                keys.push_back(it.key());
-            }
-
-            return keys;
-        }
-
-        void Read(std::string_view name, float& value) override {
-            ReadValue(name, value);
-        }
-
-        void Read(std::string_view name, bool& value) override {
-            ReadValue(name, value);
-        }
-
-        void Read(std::string_view name, int& value) override {
-            ReadValue(name, value);
-        }
-
-        void Read(std::string_view name, std::string& value) override {
-            ReadValue(name, value);
-        }
-
-    private:
-        const nlohmann::json& m_root;
-        const nlohmann::json* m_current = nullptr;
-        std::stack<const nlohmann::json*> m_stack;
-
-        const nlohmann::json& GetChild(std::string_view name) const {
-            if (name.empty())
-                return *m_current;
-
-            return m_current->at(std::string(name));
-        }
-
-        template<typename T>
-        void ReadValue(std::string_view name, T& value) const {
-            auto key = std::string(name);
-
-            if (!m_current->contains(key))
-                return;
-
-            value = (*m_current)[key].get<T>();
-        }
-    };
-
-    class JsonSerializeWriter final : public ISerializeWriter {
-    public:
-        explicit JsonSerializeWriter(nlohmann::json& root)
-            : m_root(root), m_current(&root)
-        {
-            m_root = nlohmann::json::object();
-        }
-
-        void BeginObject(std::string_view name = {}) override {
-            nlohmann::json* obj = CreateObject(name);
-            m_stack.push(m_current);
-            m_current = obj;
-        }
-
-        void EndObject() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        void BeginArray(std::string_view name = {}) override {
-            nlohmann::json* arr = CreateArray(name);
-            m_stack.push(m_current);
-            m_current = arr;
-        }
-
-        void EndArray() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        void BeginArrayElement() override {
-            m_current->push_back(nlohmann::json::object());
-            m_stack.push(m_current);
-            m_current = &m_current->back();
-        }
-
-        void EndArrayElement() override {
-            m_current = m_stack.top();
-            m_stack.pop();
-        }
-
-        void Write(std::string_view name, float value) override {
-            (*m_current)[std::string(name)] = value;
-        }
-
-        void Write(std::string_view name, bool value) override {
-            (*m_current)[std::string(name)] = value;
-        }
-
-        void Write(std::string_view name, int32_t value) override {
-            (*m_current)[std::string(name)] = value;
-        }
-
-        void Write(std::string_view name, std::string_view value) override {
-            (*m_current)[std::string(name)] = std::string(value);
-        }
+        void BeginObject(std::string_view name = {}) override;
+        void EndObject() override;
+        void BeginArray(std::string_view name = {}) override;
+        void EndArray() override;
+        void BeginArrayElement() override;
+        void EndArrayElement() override;
+        void Write(std::string_view name, float value) override;
+        void Write(std::string_view name, bool value) override;
+        void Write(std::string_view name, int32_t value) override;
+        void Write(std::string_view name, uint32_t value) override;
+        void Write(std::string_view name, int64_t value) override;
+        void Write(std::string_view name, uint64_t value) override;
+        void Write(std::string_view name, std::string_view value) override;
 
     private:
         nlohmann::json& m_root;
         nlohmann::json* m_current = nullptr;
         std::stack<nlohmann::json*> m_stack;
 
-        nlohmann::json* CreateObject(std::string_view name) {
-            if (name.empty()) {
-                *m_current = nlohmann::json::object();
-                return m_current;
-            }
+        nlohmann::json* CreateObject(std::string_view name);
+        nlohmann::json* CreateArray(std::string_view name);
+    };
 
-            auto key = std::string(name);
-            (*m_current)[key] = nlohmann::json::object();
-            return &(*m_current)[key];
-        }
+    class JsonSerializeReader final : public ISerializeReader
+    {
+    public:
+        explicit JsonSerializeReader(const nlohmann::json& root);
 
-        nlohmann::json* CreateArray(std::string_view name) {
-            if (name.empty()) {
-                *m_current = nlohmann::json::array();
-                return m_current;
-            }
+        void BeginObject(std::string_view name = {}) override;
+        void EndObject() override;
+        void BeginArray(std::string_view name = {}) override;
+        void EndArray() override;
+        size_t GetArraySize(std::string_view name) const override;
+        void BeginArrayElement(size_t index) override;
+        void EndArrayElement() override;
+        std::vector<std::string> GetObjectKeys() const override;
+        void Read(std::string_view name, float& value) override;
+        void Read(std::string_view name, bool& value) override;
+        void Read(std::string_view name, int32_t& value) override;
+        void Read(std::string_view name, uint32_t& value) override;
+        void Read(std::string_view name, int64_t& value) override;
+        void Read(std::string_view name, uint64_t& value) override;
+        void Read(std::string_view name, std::string& value) override;
 
-            auto key = std::string(name);
-            (*m_current)[key] = nlohmann::json::array();
-            return &(*m_current)[key];
-        }
+    private:
+        const nlohmann::json& m_root;
+        const nlohmann::json* m_current = nullptr;
+        std::stack<const nlohmann::json*> m_stack;
+
+        const nlohmann::json& GetChild(std::string_view name) const;
+        void ReadValue(std::string_view name, float& value) const;
+        void ReadValue(std::string_view name, bool& value) const;
+        void ReadValue(std::string_view name, int32_t& value) const;
+        void ReadValue(std::string_view name, uint32_t& value) const;
+        void ReadValue(std::string_view name, int64_t& value) const;
+        void ReadValue(std::string_view name, uint64_t& value) const;
+        void ReadValue(std::string_view name, std::string& value) const;
     };
 }
