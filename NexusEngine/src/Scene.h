@@ -17,9 +17,11 @@ namespace NexusEngine
 
     // Marker for the gameplay phase in the scene pipeline.
     struct GameplayPhase {};
+    struct GameplayEnabled {};
 
     // Marker for the physics phase in the scene pipeline.
     struct PhysicsPhase {};
+    struct PhysicsEnabled {};
 
     // Marker for the transform phase in the scene pipeline.
     struct TransformPhase {};

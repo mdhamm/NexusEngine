@@ -289,6 +289,7 @@ namespace NexusEngine
         const std::vector<LayoutElement>& inputLayout,
         PRIMITIVE_TOPOLOGY topology,
         CULL_MODE cullMode,
+        bool isTransparent,
         bool depthTestEnabled,
         bool depthWriteEnabled,
         TEXTURE_FORMAT rtvFormat,
@@ -323,7 +324,13 @@ namespace NexusEngine
         psoCI.GraphicsPipeline.DepthStencilDesc.DepthFunc = COMPARISON_FUNC_LESS;
 
         // Blend state
-        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].BlendEnable = false;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].BlendEnable = isTransparent;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].SrcBlend = BLEND_FACTOR_SRC_ALPHA;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].DestBlend = BLEND_FACTOR_INV_SRC_ALPHA;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].BlendOp = BLEND_OPERATION_ADD;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].SrcBlendAlpha = BLEND_FACTOR_ONE;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].DestBlendAlpha = BLEND_FACTOR_INV_SRC_ALPHA;
+        psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].BlendOpAlpha = BLEND_OPERATION_ADD;
         psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0].RenderTargetWriteMask = COLOR_MASK_ALL;
 
         // Render target and depth-stencil formats
@@ -395,6 +402,44 @@ namespace NexusEngine
         return mat;
     }
 
+    Material* RenderResourceFactory::CreateSurfaceMaterialFromFiles(
+        const char* name,
+        const char* vsFilePath,
+        const char* psFilePath,
+        bool isTransparent,
+        CULL_MODE cullMode,
+        bool depthTestEnabled,
+        bool depthWriteEnabled)
+    {
+        Material* material = CreateMaterialFromFiles(
+            name,
+            vsFilePath,
+            psFilePath,
+            CreateInstancedPosNormalUvLayout());
+        if (!material)
+        {
+            return nullptr;
+        }
+
+        material->isTransparent = isTransparent;
+        material->cullMode = cullMode;
+        material->depthTestEnabled = depthTestEnabled;
+        material->depthWriteEnabled = depthWriteEnabled;
+        material->materialConstantBuffer = CreateConstantBuffer("VSConstants", 64);
+
+        if (material->materialConstantBuffer && m_context)
+        {
+            struct VSConstantsData { float4 col0, col1, col2, col3; };
+            MapHelper<VSConstantsData> mappedData(m_context, material->materialConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
+            mappedData->col0 = float4(1, 0, 0, 0);
+            mappedData->col1 = float4(0, 1, 0, 0);
+            mappedData->col2 = float4(0, 0, 1, 0);
+            mappedData->col3 = float4(0, 0, 0, 1);
+        }
+
+        return material;
+    }
+
     RenderResourceFactory::CachedPipeline* RenderResourceFactory::GetOrCreatePipeline(
         Material* material,
         Mesh* mesh,
@@ -419,6 +464,7 @@ namespace NexusEngine
             material->m_inputLayout,
             mesh->topology,
             material->cullMode,
+            material->isTransparent,
             material->depthTestEnabled,
             material->depthWriteEnabled,
             rtvFormat,

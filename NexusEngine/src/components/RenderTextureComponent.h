@@ -1,5 +1,8 @@
 #pragma once
 
+#include "MetadataRegistry.h"
+
+#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
 
 namespace NexusEngine
@@ -21,5 +24,20 @@ namespace NexusEngine
 
         // Texture height in pixels.
         int m_height = 256;
+    };
+
+    template<>
+    struct ComponentMeta<RenderTextureComponent>
+    {
+        static void Register(flecs::world& world, MetadataRegistry& registry)
+        {
+            world.component<RenderTextureComponent>()
+                .member<int>("width")
+                .member<int>("height");
+
+            registry.component<RenderTextureComponent>("RenderTextureComponent")
+                .field("Width", &RenderTextureComponent::m_width)
+                .field("Height", &RenderTextureComponent::m_height);
+        }
     };
 } // namespace NexusEngine

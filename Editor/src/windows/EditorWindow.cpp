@@ -1,18 +1,28 @@
 #include "EditorWindow.h"
 
 #include "EditorSceneApp.h"
+#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 #include "widgets/ContentDrawerWidget.h"
 #include "widgets/PropertyWidget.h"
 #include "widgets/SceneGraphWidget.h"
 #include "widgets/SceneViewWidget.h"
 
+#include <components/CameraComponent.h>
+#include <components/EditorOnlyComponent.h>
+#include <components/FlyCameraComponent.h>
+#include <components/RenderMeshComponent.h>
+#include <components/TransformComponent.h>
+#include <rendering/RenderResourceFactory.h>
+
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QMenuBar>
 #include <QStatusBar>
 #include <QTabWidget>
+#include <QVBoxLayout>
 
 #ifdef emit
 #undef emit
@@ -44,6 +54,7 @@ namespace NexusEditor
         BuildMenus();
         BuildLayout();
         EnsureEngineInitialized();
+        SetSceneMode(true);
         statusBar()->showMessage(QStringLiteral("Ready - %1").arg(m_project.m_rootPath));
     }
 
@@ -82,7 +93,15 @@ namespace NexusEditor
         }
 
         NexusEngine::Scene* activeScene = m_engine.ActiveScene();
-        return activeScene ? LoadSceneFromFile(*activeScene, filePath) : false;
+        if (!activeScene || !LoadSceneFromFile(*activeScene, filePath))
+        {
+            return false;
+        }
+
+        m_hasLoadedScene = true;
+        ConfigureEditorCamera();
+        ResolveMaterialAssets();
+        return true;
     }
 
     void EditorWindow::TickEngineFrame(float deltaSeconds)
@@ -92,6 +111,13 @@ namespace NexusEditor
         {
             return;
         }
+
+        if (m_sceneView)
+        {
+            ResizeSceneViewport(m_sceneView->width(), m_sceneView->height());
+        }
+
+        ResolveMaterialAssets();
 
         m_engine.RunFrame(deltaSeconds);
 
@@ -135,11 +161,46 @@ namespace NexusEditor
         viewportTabs->setMovable(true);
         setCentralWidget(viewportTabs);
 
-        m_sceneView = new SceneViewWidget(*this, viewportTabs);
-        viewportTabs->addTab(m_sceneView, QStringLiteral("Scene"));
+        auto* sceneModePage = new QWidget(viewportTabs);
+        auto* sceneModeLayout = new QVBoxLayout(sceneModePage);
+        sceneModeLayout->setContentsMargins(0, 0, 0, 0);
+        viewportTabs->addTab(sceneModePage, QStringLiteral("Scene"));
 
-        auto* gameView = new QWidget(viewportTabs);
-        viewportTabs->addTab(gameView, QStringLiteral("Game"));
+        auto* gameModePage = new QWidget(viewportTabs);
+        auto* gameModeLayout = new QVBoxLayout(gameModePage);
+        gameModeLayout->setContentsMargins(0, 0, 0, 0);
+        viewportTabs->addTab(gameModePage, QStringLiteral("Game"));
+
+        m_sceneView = new SceneViewWidget(*this, sceneModePage);
+        sceneModeLayout->addWidget(m_sceneView);
+
+        connect(viewportTabs, &QTabWidget::currentChanged, this,
+            [this, viewportTabs, sceneModePage, sceneModeLayout, gameModePage, gameModeLayout](int index)
+            {
+                if (!m_sceneView)
+                {
+                    return;
+                }
+
+                QWidget* targetPage = viewportTabs->widget(index) == gameModePage ? gameModePage : sceneModePage;
+                QVBoxLayout* targetLayout = targetPage == gameModePage ? gameModeLayout : sceneModeLayout;
+                if (m_sceneView->parentWidget() != targetPage)
+                {
+                    if (QWidget* currentParent = m_sceneView->parentWidget())
+                    {
+                        if (QLayout* currentLayout = currentParent->layout())
+                        {
+                            currentLayout->removeWidget(m_sceneView);
+                        }
+                    }
+
+                    m_sceneView->setParent(targetPage);
+                    targetLayout->addWidget(m_sceneView);
+                    m_sceneView->show();
+                }
+
+                SetSceneMode(targetPage == sceneModePage);
+            });
 
         auto* sceneGraphDock = new QDockWidget(QStringLiteral("Scene Graph"), this);
         sceneGraphDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -202,6 +263,14 @@ namespace NexusEditor
 
                 statusBar()->showMessage(QStringLiteral("Loaded scene %1").arg(sceneFilePath), 3000);
             });
+        m_contentDrawer->SetAssetSelectedCallback(
+            [this](const QString& assetPath)
+            {
+                if (m_propertyWidget)
+                {
+                    m_propertyWidget->SetSelectedAssetPath(assetPath);
+                }
+            });
         m_contentDrawer->SetAssetRenamedCallback(
             [this](const QString& oldPath, const QString& newPath)
             {
@@ -209,6 +278,87 @@ namespace NexusEditor
             });
         contentDrawerDock->setWidget(m_contentDrawer);
         addDockWidget(Qt::BottomDockWidgetArea, contentDrawerDock);
+    }
+
+    void EditorWindow::ResolveMaterialAssets()
+    {
+        NexusEngine::Scene* activeScene = m_engine.ActiveScene();
+        if (!activeScene)
+        {
+            return;
+        }
+
+        NexusEngine::RenderResourceFactory* factory = activeScene->GetResourceFactory();
+        if (!factory)
+        {
+            return;
+        }
+
+        activeScene->m_world.each<NexusEngine::RenderMeshComponent>(
+            [this, factory](flecs::entity, NexusEngine::RenderMeshComponent& renderMesh)
+            {
+                if (renderMesh.m_materialAssetPath.empty())
+                {
+                    return;
+                }
+
+                const QString configuredPath = QString::fromStdString(renderMesh.m_materialAssetPath).trimmed();
+                const QString absolutePath = QDir::cleanPath(QFileInfo(configuredPath).isAbsolute()
+                    ? configuredPath
+                    : QDir(m_project.m_rootPath).filePath(configuredPath));
+
+                const QFileInfo materialFileInfo(absolutePath);
+                if (!materialFileInfo.exists())
+                {
+                    return;
+                }
+
+                MaterialAssetCacheEntry cacheEntry = m_materialAssetCache.value(absolutePath);
+                if (!cacheEntry.m_material || cacheEntry.m_lastModified != materialFileInfo.lastModified())
+                {
+                    MaterialAssetData materialData;
+                    if (!LoadMaterialAssetFile(absolutePath, materialData))
+                    {
+                        return;
+                    }
+
+                    const auto toCullMode = [](const QString& cullModeText)
+                    {
+                        if (cullModeText.compare(QStringLiteral("Front"), Qt::CaseInsensitive) == 0)
+                        {
+                            return Diligent::CULL_MODE_FRONT;
+                        }
+
+                        if (cullModeText.compare(QStringLiteral("Back"), Qt::CaseInsensitive) == 0)
+                        {
+                            return Diligent::CULL_MODE_BACK;
+                        }
+
+                        return Diligent::CULL_MODE_NONE;
+                    };
+
+                    std::shared_ptr<NexusEngine::Material> material(
+                        factory->CreateSurfaceMaterialFromFiles(
+                            materialData.m_name.toUtf8().constData(),
+                            materialData.m_vertexShaderPath.toUtf8().constData(),
+                            materialData.m_pixelShaderPath.toUtf8().constData(),
+                            materialData.m_isTransparent,
+                            toCullMode(materialData.m_cullMode),
+                            materialData.m_depthTestEnabled,
+                            materialData.m_depthWriteEnabled));
+
+                    if (!material)
+                    {
+                        return;
+                    }
+
+                    cacheEntry.m_lastModified = materialFileInfo.lastModified();
+                    cacheEntry.m_material = std::move(material);
+                    m_materialAssetCache.insert(absolutePath, cacheEntry);
+                }
+
+                renderMesh.material = cacheEntry.m_material.get();
+            });
     }
 
     void EditorWindow::EnsureEngineInitialized()
@@ -232,6 +382,106 @@ namespace NexusEditor
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
 
         m_isEngineInitialized = m_engine.Initialize(nativeWindow, std::move(game));
+    }
+
+    void EditorWindow::SetSceneMode(bool isSceneMode)
+    {
+        m_isSceneMode = isSceneMode;
+
+        if (!m_isEngineInitialized)
+        {
+            return;
+        }
+
+        if (NexusEngine::Scene* activeScene = m_engine.ActiveScene())
+        {
+            if (m_isSceneMode)
+            {
+                activeScene->m_world.remove<NexusEngine::GameplayEnabled>();
+                activeScene->m_world.remove<NexusEngine::PhysicsEnabled>();
+            }
+            else
+            {
+                activeScene->m_world.add<NexusEngine::GameplayEnabled>();
+                activeScene->m_world.add<NexusEngine::PhysicsEnabled>();
+            }
+        }
+
+        ConfigureEditorCamera();
+
+        if (m_sceneGraph)
+        {
+            m_sceneGraph->Refresh();
+        }
+
+        if (m_propertyWidget)
+        {
+            m_propertyWidget->Refresh();
+        }
+    }
+
+    void EditorWindow::ConfigureEditorCamera()
+    {
+        NexusEngine::Scene* activeScene = m_engine.ActiveScene();
+        if (!activeScene)
+        {
+            return;
+        }
+
+        flecs::entity editorCamera = activeScene->m_world.lookup("EditorCamera");
+        if (!m_hasLoadedScene)
+        {
+            if (editorCamera.is_valid())
+            {
+                editorCamera.destruct();
+            }
+            return;
+        }
+
+        if (!editorCamera.is_valid())
+        {
+            editorCamera = activeScene->m_world.entity("EditorCamera")
+                .add<NexusEngine::EditorOnlyComponent>()
+                .set(NexusEngine::TransformComponent::FromLocal(
+                    Diligent::float3(0.0f, 0.0f, 10.0f),
+                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                    Diligent::float3(1.0f, 1.0f, 1.0f)));
+        }
+        else if (!editorCamera.has<NexusEngine::EditorOnlyComponent>())
+        {
+            editorCamera.add<NexusEngine::EditorOnlyComponent>();
+        }
+
+        if (m_isSceneMode)
+        {
+            if (!editorCamera.has<NexusEngine::CameraComponent>())
+            {
+                editorCamera.set(NexusEngine::CameraComponent{});
+            }
+
+            if (auto* camera = editorCamera.get_mut<NexusEngine::CameraComponent>())
+            {
+                camera->m_target = NexusEngine::CameraComponent::Target::SwapChain;
+                camera->m_priority = 1000;
+            }
+
+            if (!editorCamera.has<NexusEngine::FlyCameraComponent>())
+            {
+                editorCamera.set(NexusEngine::FlyCameraComponent{});
+            }
+        }
+        else
+        {
+            if (editorCamera.has<NexusEngine::FlyCameraComponent>())
+            {
+                editorCamera.remove<NexusEngine::FlyCameraComponent>();
+            }
+
+            if (editorCamera.has<NexusEngine::CameraComponent>())
+            {
+                editorCamera.remove<NexusEngine::CameraComponent>();
+            }
+        }
     }
 
     void EditorWindow::UpdateLoadedSceneFilePath(const QString& oldPath, const QString& newPath)

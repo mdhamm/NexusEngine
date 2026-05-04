@@ -5,7 +5,14 @@
 #endif
 
 #include <NexusEngine.h>
+#include <QDateTime>
+#include <QHash>
 #include <QMainWindow>
+
+namespace NexusEngine
+{
+    struct Material;
+}
 
 #include "AssetFileReference.h"
 #include "EditorProject.h"
@@ -93,6 +100,9 @@ namespace NexusEditor
     private:
         void BuildMenus();
         void BuildLayout();
+        void ResolveMaterialAssets();
+        void SetSceneMode(bool isSceneMode);
+        void ConfigureEditorCamera();
         void UpdateLoadedSceneFilePath(const QString& oldPath, const QString& newPath);
         bool ResolveSceneFilePath();
         void SaveScene();
@@ -107,5 +117,15 @@ namespace NexusEditor
         NexusEngine::Engine m_engine;
         QtInputBackend m_inputBackend;
         bool m_isEngineInitialized = false;
+        bool m_isSceneMode = true;
+        bool m_hasLoadedScene = false;
+
+        struct MaterialAssetCacheEntry
+        {
+            QDateTime m_lastModified;
+            std::shared_ptr<NexusEngine::Material> m_material;
+        };
+
+        QHash<QString, MaterialAssetCacheEntry> m_materialAssetCache;
     };
 } // namespace NexusEditor

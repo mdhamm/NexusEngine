@@ -1,5 +1,6 @@
 #include "PropertyWidget.h"
 
+#include "EditorMaterialSerializer.h"
 #include "EditorWindow.h"
 
 #include <QApplication>
@@ -19,8 +20,10 @@
 #undef emit
 #endif
 
-#include <ComponentReflection.h>
+#include <ComponentAccess.h>
+#include <MetadataRegistry.h>
 #include <Scene.h>
+#include <components/EditorOnlyComponent.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -57,6 +60,11 @@ namespace NexusEditor
             return QStringLiteral("PropertyWidget.%1.%2")
                 .arg(QString::fromStdString(componentName), QString::fromStdString(propertyName));
         }
+
+        QString GetInspectorFieldTypeLabel(const NexusEngine::FieldView& field)
+        {
+            return QString::fromStdString(NexusEngine::GetFieldTypeLabel(field));
+        }
     }
 
     PropertyWidget::PropertyWidget(EditorWindow& editorWindow, QWidget* parent)
@@ -68,16 +76,16 @@ namespace NexusEditor
 
         auto* addComponentLayout = new QHBoxLayout();
         m_addComponentComboBox = new QComboBox(this);
-        auto* addComponentButton = new QPushButton(QStringLiteral("Add Component"), this);
+        m_addComponentButton = new QPushButton(QStringLiteral("Add Component"), this);
         addComponentLayout->addWidget(m_addComponentComboBox, 1);
-        addComponentLayout->addWidget(addComponentButton);
+        addComponentLayout->addWidget(m_addComponentButton);
         rootLayout->addLayout(addComponentLayout);
 
         m_contentLayout = new QVBoxLayout();
         rootLayout->addLayout(m_contentLayout);
         rootLayout->addStretch(1);
 
-        connect(addComponentButton, &QPushButton::clicked, this, [this]()
+        connect(m_addComponentButton, &QPushButton::clicked, this, [this]()
             {
                 if (!m_editorWindow || !m_editorWindow->IsEngineInitialized() || m_selectedEntityId == 0)
                 {
@@ -103,11 +111,12 @@ namespace NexusEditor
                     return;
                 }
 
-                for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+                for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
                 {
-                    if (descriptor.m_name == componentName && descriptor.m_addComponent)
+                    (void)type;
+                    if (metadata.m_name == componentName && metadata.m_addComponent)
                     {
-                        descriptor.m_addComponent(entity);
+                        metadata.m_addComponent(entity);
                         break;
                     }
                 }
@@ -120,6 +129,7 @@ namespace NexusEditor
 
     void PropertyWidget::SetSelectedEntityId(std::uint64_t entityId)
     {
+        m_selectedAssetPath.clear();
         if (m_selectedEntityId == entityId)
         {
             return;
@@ -129,8 +139,36 @@ namespace NexusEditor
         Refresh();
     }
 
+    void PropertyWidget::SetSelectedAssetPath(const QString& assetPath)
+    {
+        const QString cleanAssetPath = assetPath.trimmed();
+        if (m_selectedAssetPath == cleanAssetPath)
+        {
+            return;
+        }
+
+        m_selectedAssetPath = cleanAssetPath;
+        m_selectedEntityId = 0;
+        Refresh();
+    }
+
     void PropertyWidget::Refresh()
     {
+        const bool isMaterialAssetSelected = IsMaterialAssetFilePath(m_selectedAssetPath);
+        m_addComponentComboBox->setVisible(!isMaterialAssetSelected);
+        if (m_addComponentButton)
+        {
+            m_addComponentButton->setVisible(!isMaterialAssetSelected);
+        }
+
+        if (isMaterialAssetSelected)
+        {
+            m_addComponentComboBox->clear();
+            RebuildAssetContents();
+            m_lastStructureSignature = QStringLiteral("asset:%1").arg(m_selectedAssetPath);
+            return;
+        }
+
         RebuildAddComponentOptions();
         RebuildContents();
         m_lastStructureSignature = CaptureStructureSignature();
@@ -139,6 +177,11 @@ namespace NexusEditor
     void PropertyWidget::RefreshIfNotInteracting()
     {
         if (IsInteracting())
+        {
+            return;
+        }
+
+        if (IsMaterialAssetFilePath(m_selectedAssetPath))
         {
             return;
         }
@@ -186,41 +229,128 @@ namespace NexusEditor
         QString signature = QStringLiteral("entity:%1")
             .arg(static_cast<qulonglong>(m_selectedEntityId));
 
-        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
         {
-            if (!descriptor.m_hasComponent || !descriptor.m_hasComponent(entity))
+            (void)type;
+            if (!metadata.m_hasComponent || !metadata.m_hasComponent(entity))
             {
                 continue;
             }
 
-            signature += QStringLiteral("|component:%1").arg(QString::fromStdString(descriptor.m_name));
+            signature += QStringLiteral("|component:%1").arg(QString::fromStdString(metadata.m_name));
 
-            const std::vector<NexusEngine::ComponentPropertyDescriptor> properties =
-                descriptor.m_getProperties ? descriptor.m_getProperties(entity) : std::vector<NexusEngine::ComponentPropertyDescriptor>{};
-
-            for (const auto& property : properties)
+            const std::optional<NexusEngine::ComponentView> componentView = NexusEngine::CreateEntityComponentView(metadata, entity);
+            if (!componentView)
             {
-                signature += QStringLiteral("|property:%1:%2:%3:%4")
-                    .arg(QString::fromStdString(property.m_name))
-                    .arg(QString::fromStdString(property.m_typeName))
-                    .arg(static_cast<int>(property.m_valueType))
-                    .arg(property.m_isReadOnly ? 1 : 0);
+                continue;
             }
+
+            NexusEngine::ForEachField(
+                *componentView,
+                [&](const NexusEngine::FieldView& field)
+                {
+                    signature += QStringLiteral("|property:%1:%2:%3:%4")
+                        .arg(QString::fromStdString(std::string(field.m_name)))
+                        .arg(GetInspectorFieldTypeLabel(field))
+                        .arg(static_cast<int>(NexusEngine::GetFieldValueKind(field)))
+                        .arg(NexusEngine::IsFieldReadOnly(field) ? 1 : 0);
+                });
         }
 
         signature += QStringLiteral("|addable:");
-        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
         {
-            if (!descriptor.m_addComponent || (descriptor.m_hasComponent && descriptor.m_hasComponent(entity)))
+            (void)type;
+            if (!metadata.m_addComponent || (metadata.m_hasComponent && metadata.m_hasComponent(entity)))
             {
                 continue;
             }
 
-            signature += QString::fromStdString(descriptor.m_name);
+            signature += QString::fromStdString(metadata.m_name);
             signature += QLatin1Char(';');
         }
 
         return signature;
+    }
+
+    void PropertyWidget::RebuildAssetContents()
+    {
+        ClearLayout(m_contentLayout);
+
+        MaterialAssetData materialData;
+        if (!LoadMaterialAssetFile(m_selectedAssetPath, materialData))
+        {
+            m_contentLayout->addWidget(new QLabel(QStringLiteral("Select an entity to inspect"), this));
+            return;
+        }
+
+        auto* assetNameLabel = new QLabel(materialData.m_name, this);
+        m_contentLayout->addWidget(assetNameLabel);
+
+        auto* groupBox = new QGroupBox(QStringLiteral("Material"), this);
+        auto* formLayout = new QFormLayout(groupBox);
+
+        auto saveMaterial = [this](const MaterialAssetData& updatedMaterialData)
+        {
+            (void)SaveMaterialAssetFile(m_selectedAssetPath, updatedMaterialData);
+        };
+
+        auto* vertexShaderLineEdit = new QLineEdit(materialData.m_vertexShaderPath, groupBox);
+        connect(vertexShaderLineEdit, &QLineEdit::editingFinished, groupBox, [saveMaterial, materialData, vertexShaderLineEdit]() mutable
+            {
+                materialData.m_vertexShaderPath = vertexShaderLineEdit->text().trimmed();
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Vertex Shader (string)"), vertexShaderLineEdit);
+
+        auto* pixelShaderLineEdit = new QLineEdit(materialData.m_pixelShaderPath, groupBox);
+        connect(pixelShaderLineEdit, &QLineEdit::editingFinished, groupBox, [saveMaterial, materialData, pixelShaderLineEdit]() mutable
+            {
+                materialData.m_pixelShaderPath = pixelShaderLineEdit->text().trimmed();
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Pixel Shader (string)"), pixelShaderLineEdit);
+
+        auto* transparentCheckBox = new QCheckBox(groupBox);
+        transparentCheckBox->setChecked(materialData.m_isTransparent);
+        connect(transparentCheckBox, &QCheckBox::toggled, groupBox, [saveMaterial, materialData](bool checked) mutable
+            {
+                materialData.m_isTransparent = checked;
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Transparent (bool)"), transparentCheckBox);
+
+        auto* cullModeComboBox = new QComboBox(groupBox);
+        cullModeComboBox->addItem(QStringLiteral("None"));
+        cullModeComboBox->addItem(QStringLiteral("Front"));
+        cullModeComboBox->addItem(QStringLiteral("Back"));
+        cullModeComboBox->setCurrentText(materialData.m_cullMode);
+        connect(cullModeComboBox, &QComboBox::currentTextChanged, groupBox, [saveMaterial, materialData](const QString& text) mutable
+            {
+                materialData.m_cullMode = text;
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Cull Mode (string)"), cullModeComboBox);
+
+        auto* depthTestCheckBox = new QCheckBox(groupBox);
+        depthTestCheckBox->setChecked(materialData.m_depthTestEnabled);
+        connect(depthTestCheckBox, &QCheckBox::toggled, groupBox, [saveMaterial, materialData](bool checked) mutable
+            {
+                materialData.m_depthTestEnabled = checked;
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Depth Test Enabled (bool)"), depthTestCheckBox);
+
+        auto* depthWriteCheckBox = new QCheckBox(groupBox);
+        depthWriteCheckBox->setChecked(materialData.m_depthWriteEnabled);
+        connect(depthWriteCheckBox, &QCheckBox::toggled, groupBox, [saveMaterial, materialData](bool checked) mutable
+            {
+                materialData.m_depthWriteEnabled = checked;
+                saveMaterial(materialData);
+            });
+        formLayout->addRow(QStringLiteral("Depth Write Enabled (bool)"), depthWriteCheckBox);
+
+        m_contentLayout->addWidget(groupBox);
     }
 
     void PropertyWidget::SyncDisplayedValues()
@@ -242,6 +372,11 @@ namespace NexusEditor
             return;
         }
 
+        if (entity.has<NexusEngine::EditorOnlyComponent>())
+        {
+            return;
+        }
+
         if (auto* entityNameLabel = findChild<QLabel*>(QString::fromUtf8(EntityNameLabelObjectName)))
         {
             const char* entityName = entity.name();
@@ -254,45 +389,50 @@ namespace NexusEditor
             }
         }
 
-        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
         {
-            if (!descriptor.m_hasComponent || !descriptor.m_hasComponent(entity))
+            (void)type;
+            if (!metadata.m_hasComponent || !metadata.m_hasComponent(entity))
             {
                 continue;
             }
 
-            const std::vector<NexusEngine::ComponentPropertyDescriptor> properties =
-                descriptor.m_getProperties ? descriptor.m_getProperties(entity) : std::vector<NexusEngine::ComponentPropertyDescriptor>{};
-
-            for (const auto& property : properties)
+            const std::optional<NexusEngine::ComponentView> componentView = NexusEngine::CreateEntityComponentView(metadata, entity);
+            if (!componentView)
             {
-                const QString objectName = MakePropertyControlObjectName(descriptor.m_name, property.m_name);
-                if (property.m_valueType == NexusEngine::ComponentPropertyValueType::Bool)
-                {
-                    if (auto* checkBox = findChild<QCheckBox*>(objectName))
-                    {
-                        const bool isChecked = property.m_getValue && property.m_getValue(entity) == "true";
-                        const bool isEnabled = !property.m_isReadOnly && static_cast<bool>(property.m_setValue);
-                        QSignalBlocker blocker(checkBox);
-                        checkBox->setChecked(isChecked);
-                        checkBox->setEnabled(isEnabled);
-                    }
-                }
-                else
-                {
-                    if (auto* lineEdit = findChild<QLineEdit*>(objectName))
-                    {
-                        const QString newValue = property.m_getValue ? QString::fromStdString(property.m_getValue(entity)) : QString{};
-                        const bool isReadOnly = property.m_isReadOnly || !property.m_setValue;
-                        QSignalBlocker blocker(lineEdit);
-                        if (lineEdit->text() != newValue)
-                        {
-                            lineEdit->setText(newValue);
-                        }
-                        lineEdit->setReadOnly(isReadOnly);
-                    }
-                }
+                continue;
             }
+
+            NexusEngine::ForEachField(
+                *componentView,
+                [this, &metadata](const NexusEngine::FieldView& field)
+                {
+                    const QString objectName = MakePropertyControlObjectName(metadata.m_name, std::string(field.m_name));
+                    const bool isReadOnly = NexusEngine::IsFieldReadOnly(field);
+                    if (NexusEngine::GetFieldValueKind(field) == NexusEngine::FieldValueKind::Bool)
+                    {
+                        if (auto* checkBox = findChild<QCheckBox*>(objectName))
+                        {
+                            const bool isChecked = NexusEngine::ReadFieldBool(field).value_or(false);
+                            QSignalBlocker blocker(checkBox);
+                            checkBox->setChecked(isChecked);
+                            checkBox->setEnabled(!isReadOnly);
+                        }
+                    }
+                    else
+                    {
+                        if (auto* lineEdit = findChild<QLineEdit*>(objectName))
+                        {
+                            const QString newValue = QString::fromStdString(NexusEngine::ReadFieldText(field).value_or(std::string{}));
+                            QSignalBlocker blocker(lineEdit);
+                            if (lineEdit->text() != newValue)
+                            {
+                                lineEdit->setText(newValue);
+                            }
+                            lineEdit->setReadOnly(isReadOnly);
+                        }
+                    }
+                });
         }
     }
 
@@ -327,6 +467,13 @@ namespace NexusEditor
             return;
         }
 
+        if (entity.has<NexusEngine::EditorOnlyComponent>())
+        {
+            m_selectedEntityId = 0;
+            m_contentLayout->addWidget(new QLabel(QStringLiteral("Select an entity to inspect"), this));
+            return;
+        }
+
         const char* entityName = entity.name();
         auto* entityNameLabel = new QLabel(
             entityName && entityName[0] != '\0'
@@ -337,61 +484,64 @@ namespace NexusEditor
         m_contentLayout->addWidget(entityNameLabel);
 
         bool addedAnyComponents = false;
-        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
         {
-            if (!descriptor.m_hasComponent || !descriptor.m_hasComponent(entity))
+            (void)type;
+            if (!metadata.m_hasComponent || !metadata.m_hasComponent(entity))
             {
                 continue;
             }
 
-            auto* groupBox = new QGroupBox(QString::fromStdString(descriptor.m_name), this);
+            const std::optional<NexusEngine::ComponentView> componentView = NexusEngine::CreateEntityComponentView(metadata, entity);
+            if (!componentView)
+            {
+                continue;
+            }
+
+            auto* groupBox = new QGroupBox(QString::fromStdString(metadata.m_name), this);
             auto* formLayout = new QFormLayout(groupBox);
 
-            const std::vector<NexusEngine::ComponentPropertyDescriptor> properties =
-                descriptor.m_getProperties ? descriptor.m_getProperties(entity) : std::vector<NexusEngine::ComponentPropertyDescriptor>{};
-
-            for (const auto& property : properties)
-            {
-                const QString labelText = QString::fromStdString(property.m_name + " (" + property.m_typeName + ")");
-                if (property.m_valueType == NexusEngine::ComponentPropertyValueType::Bool)
+            NexusEngine::ForEachField(
+                *componentView,
+                [groupBox, formLayout, entity, &metadata](const NexusEngine::FieldView& field)
                 {
-                    auto* checkBox = new QCheckBox(groupBox);
-                    checkBox->setObjectName(MakePropertyControlObjectName(descriptor.m_name, property.m_name));
-                    checkBox->setChecked(property.m_getValue && property.m_getValue(entity) == "true");
-                    checkBox->setEnabled(!property.m_isReadOnly && static_cast<bool>(property.m_setValue));
-                    if (!property.m_isReadOnly && property.m_setValue)
+                    const std::string fieldName(field.m_name);
+                    const QString labelText = QStringLiteral("%1 (%2)")
+                        .arg(QString::fromStdString(fieldName), GetInspectorFieldTypeLabel(field));
+                    const bool isReadOnly = NexusEngine::IsFieldReadOnly(field);
+                    if (NexusEngine::GetFieldValueKind(field) == NexusEngine::FieldValueKind::Bool)
                     {
-                        const auto setter = property.m_setValue;
-                        connect(checkBox, &QCheckBox::toggled, groupBox, [entity, setter](bool checked)
-                            {
-                                setter(entity, checked ? std::string("true") : std::string("false"));
-                            });
+                        auto* checkBox = new QCheckBox(groupBox);
+                        checkBox->setObjectName(MakePropertyControlObjectName(metadata.m_name, fieldName));
+                        checkBox->setChecked(NexusEngine::ReadFieldBool(field).value_or(false));
+                        checkBox->setEnabled(!isReadOnly);
+                        if (!isReadOnly)
+                        {
+                            const NexusEngine::ComponentMetadata* metadataPtr = &metadata;
+                            connect(checkBox, &QCheckBox::toggled, groupBox, [entity, metadataPtr, fieldName](bool checked)
+                                {
+                                    (void)NexusEngine::WriteFieldBool(*metadataPtr, entity, fieldName, checked);
+                                });
+                        }
+                        formLayout->addRow(labelText, checkBox);
                     }
-                    formLayout->addRow(labelText, checkBox);
-                }
-                else
-                {
-                    auto* lineEdit = new QLineEdit(groupBox);
-                    lineEdit->setObjectName(MakePropertyControlObjectName(descriptor.m_name, property.m_name));
-                    lineEdit->setText(property.m_getValue ? QString::fromStdString(property.m_getValue(entity)) : QString{});
-                    lineEdit->setReadOnly(property.m_isReadOnly || !property.m_setValue);
-                    if (!property.m_isReadOnly && property.m_setValue)
+                    else
                     {
-                        const auto setter = property.m_setValue;
-                        connect(lineEdit, &QLineEdit::editingFinished, groupBox, [entity, lineEdit, setter]()
-                            {
-                                try
+                        auto* lineEdit = new QLineEdit(groupBox);
+                        lineEdit->setObjectName(MakePropertyControlObjectName(metadata.m_name, fieldName));
+                        lineEdit->setText(QString::fromStdString(NexusEngine::ReadFieldText(field).value_or(std::string{})));
+                        lineEdit->setReadOnly(isReadOnly);
+                        if (!isReadOnly)
+                        {
+                            const NexusEngine::ComponentMetadata* metadataPtr = &metadata;
+                            connect(lineEdit, &QLineEdit::editingFinished, groupBox, [entity, lineEdit, metadataPtr, fieldName]()
                                 {
-                                    setter(entity, lineEdit->text().toStdString());
-                                }
-                                catch (...)
-                                {
-                                }
-                            });
+                                    (void)NexusEngine::WriteFieldText(*metadataPtr, entity, fieldName, lineEdit->text().toStdString());
+                                });
+                        }
+                        formLayout->addRow(labelText, lineEdit);
                     }
-                    formLayout->addRow(labelText, lineEdit);
-                }
-            }
+                });
 
             m_contentLayout->addWidget(groupBox);
             addedAnyComponents = true;
@@ -399,7 +549,7 @@ namespace NexusEditor
 
         if (!addedAnyComponents)
         {
-            m_contentLayout->addWidget(new QLabel(QStringLiteral("Entity has no reflected components"), this));
+            m_contentLayout->addWidget(new QLabel(QStringLiteral("Entity has no inspectable components"), this));
         }
     }
 
@@ -424,14 +574,20 @@ namespace NexusEditor
             return;
         }
 
-        for (const auto& descriptor : NexusEngine::ComponentReflectionRegistry::Instance().GetDescriptors())
+        if (entity.has<NexusEngine::EditorOnlyComponent>())
         {
-            if (!descriptor.m_addComponent || (descriptor.m_hasComponent && descriptor.m_hasComponent(entity)))
+            return;
+        }
+
+        for (const auto& [type, metadata] : NexusEngine::MetadataRegistry::Instance().GetAll())
+        {
+            (void)type;
+            if (!metadata.m_addComponent || (metadata.m_hasComponent && metadata.m_hasComponent(entity)))
             {
                 continue;
             }
 
-            m_addComponentComboBox->addItem(QString::fromStdString(descriptor.m_name), QString::fromStdString(descriptor.m_name));
+            m_addComponentComboBox->addItem(QString::fromStdString(metadata.m_name), QString::fromStdString(metadata.m_name));
         }
     }
 } // namespace NexusEditor

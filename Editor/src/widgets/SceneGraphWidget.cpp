@@ -3,6 +3,7 @@
 #include "EditorWindow.h"
 
 #include <Scene.h>
+#include <components/EditorOnlyComponent.h>
 #include <components/TransformComponent.h>
 
 #include <QHeaderView>
@@ -121,6 +122,11 @@ namespace NexusEditor
             {
                 if (entity.is_valid() && entity.is_alive())
                 {
+                    if (entity.has<NexusEngine::EditorOnlyComponent>())
+                    {
+                        return;
+                    }
+
                     entities.push_back(entity);
                 }
             });

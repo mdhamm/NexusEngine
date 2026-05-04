@@ -3,13 +3,15 @@
 #include <cassert>
 #include <cmath>
 
-#include "ComponentReflection.h"
+#include "MetadataRegistry.h"
 
 #include <flecs.h>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 
 namespace NexusEngine
 {
+    struct TransformComponent;
+
     // Minimal quaternion helper used by transform code.
     struct Quaternion
     {
@@ -374,13 +376,9 @@ namespace NexusEngine
             return m_worldMatrix;
         }
 
-        /// <summary>
-        /// Creates the editor reflection descriptor for the transform component.
-        /// </summary>
-        /// <returns>The transform component descriptor.</returns>
-        static ComponentDescriptor CreateDescriptor();
-
     private:
+        friend struct ComponentMeta<TransformComponent>;
+
         friend flecs::entity GetTransformParent(const flecs::entity& entity);
         friend TransformComponent& RequireTransform(const flecs::entity& entity);
 
@@ -855,109 +853,37 @@ namespace NexusEngine
             });
     }
 
-    inline ComponentDescriptor TransformComponent::CreateDescriptor()
+    template<>
+    struct ComponentMeta<TransformComponent>
     {
-        return ComponentDescriptor{
-            "TransformComponent",
-            [](const flecs::entity& entity) { return entity.has<TransformComponent>(); },
-            [](flecs::entity entity) { entity.set(TransformComponent{}); },
-            [](const flecs::entity& entity)
-            {
-                std::vector<ComponentPropertyDescriptor> properties;
-                const auto* transform = entity.get<TransformComponent>();
-                if (!transform)
+        static void Register(flecs::world& world, MetadataRegistry& registry)
+        {
+            world.component<TransformComponent>();
+
+            TransformComponent layout;
+            const char* baseAddress = reinterpret_cast<const char*>(&layout);
+            const size_t localPositionOffset = static_cast<size_t>(reinterpret_cast<const char*>(&layout.m_localPosition) - baseAddress);
+            const size_t localRotationOffset = static_cast<size_t>(reinterpret_cast<const char*>(&layout.m_localRotation) - baseAddress);
+            const size_t localScaleOffset = static_cast<size_t>(reinterpret_cast<const char*>(&layout.m_localScale) - baseAddress);
+
+            registry.component<TransformComponent>("TransformComponent")
+                .field<float>("Position.X", localPositionOffset + offsetof(Diligent::float3, x))
+                .field<float>("Position.Y", localPositionOffset + offsetof(Diligent::float3, y))
+                .field<float>("Position.Z", localPositionOffset + offsetof(Diligent::float3, z))
+                .field<float>("Rotation.X", localRotationOffset + offsetof(Quaternion, x))
+                .field<float>("Rotation.Y", localRotationOffset + offsetof(Quaternion, y))
+                .field<float>("Rotation.Z", localRotationOffset + offsetof(Quaternion, z))
+                .field<float>("Rotation.W", localRotationOffset + offsetof(Quaternion, w))
+                .field<float>("Scale.X", localScaleOffset + offsetof(Diligent::float3, x))
+                .field<float>("Scale.Y", localScaleOffset + offsetof(Diligent::float3, y))
+                .field<float>("Scale.Z", localScaleOffset + offsetof(Diligent::float3, z));
+
+            registry.SetAfterApply<TransformComponent>(
+                [](const flecs::entity& entity, TransformComponent&)
                 {
-                    return properties;
-                }
-
-                const auto appendVector3Properties =
-                    [&](const char* prefix,
-                        const Diligent::float3& value,
-                        const auto& setter)
-                    {
-                        properties.push_back(ComponentPropertyDescriptor{
-                            std::string(prefix) + ".X",
-                            "float",
-                            ComponentPropertyValueType::Float,
-                            false,
-                            [value](const flecs::entity&) { return FormatComponentFloat(value.x); },
-                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 0, text); } });
-                        properties.push_back(ComponentPropertyDescriptor{
-                            std::string(prefix) + ".Y",
-                            "float",
-                            ComponentPropertyValueType::Float,
-                            false,
-                            [value](const flecs::entity&) { return FormatComponentFloat(value.y); },
-                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 1, text); } });
-                        properties.push_back(ComponentPropertyDescriptor{
-                            std::string(prefix) + ".Z",
-                            "float",
-                            ComponentPropertyValueType::Float,
-                            false,
-                            [value](const flecs::entity&) { return FormatComponentFloat(value.z); },
-                            [setter](const flecs::entity& target, const std::string& text) { setter(target, 2, text); } });
-                    };
-
-                appendVector3Properties(
-                    "Position",
-                    transform->GetLocalPosition(),
-                    [](const flecs::entity& target, int axis, const std::string& text)
-                    {
-                        auto* editable = target.get_mut<TransformComponent>();
-                        if (!editable)
-                        {
-                            return;
-                        }
-
-                        Diligent::float3 value = editable->GetLocalPosition();
-                        const float parsed = std::stof(text);
-                        if (axis == 0) value.x = parsed;
-                        if (axis == 1) value.y = parsed;
-                        if (axis == 2) value.z = parsed;
-                        SetLocalPosition(target, value);
-                    });
-
-                const Diligent::float3 euler = Quaternion::ToEuler(transform->GetLocalRotation());
-                appendVector3Properties(
-                    "Rotation",
-                    euler,
-                    [](const flecs::entity& target, int axis, const std::string& text)
-                    {
-                        auto* editable = target.get_mut<TransformComponent>();
-                        if (!editable)
-                        {
-                            return;
-                        }
-
-                        Diligent::float3 value = Quaternion::ToEuler(editable->GetLocalRotation());
-                        const float parsed = std::stof(text);
-                        if (axis == 0) value.x = parsed;
-                        if (axis == 1) value.y = parsed;
-                        if (axis == 2) value.z = parsed;
-                        SetLocalRotation(target, Quaternion::FromEuler(value));
-                    });
-
-                appendVector3Properties(
-                    "Scale",
-                    transform->GetLocalScale(),
-                    [](const flecs::entity& target, int axis, const std::string& text)
-                    {
-                        auto* editable = target.get_mut<TransformComponent>();
-                        if (!editable)
-                        {
-                            return;
-                        }
-
-                        Diligent::float3 value = editable->GetLocalScale();
-                        const float parsed = std::stof(text);
-                        if (axis == 0) value.x = parsed;
-                        if (axis == 1) value.y = parsed;
-                        if (axis == 2) value.z = parsed;
-                        SetLocalScale(target, value);
-                    });
-
-                return properties;
-            } };
-    }
+                    UpdateWorldRecursive(entity);
+                });
+        }
+    };
 
 } // namespace NexusEngine

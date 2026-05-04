@@ -7,7 +7,7 @@ file(GLOB_RECURSE NEXUS_ENGINE_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/components/FlyCameraComponent.h" "src/input/InputState.h")
+add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/components/FlyCameraComponent.h" "src/input/InputState.h" "src/serialization/ISerializer.h")
 
 target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -55,6 +55,7 @@ target_include_directories(NexusEngine PRIVATE
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsTools/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsAccessories/interface
   ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Platforms/Basic/interface
+  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentTools/ThirdParty/json/include
 )
 
 if(BUILD_WEB)

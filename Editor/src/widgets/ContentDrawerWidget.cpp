@@ -1,6 +1,7 @@
 #include "ContentDrawerWidget.h"
 
 #include "AssetFileReference.h"
+#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 
 #include <QDir>
@@ -326,6 +327,24 @@ namespace NexusEditor
                 }
             });
 
+        connect(m_contentListView, &QListView::clicked, this,
+            [this](const QModelIndex& index)
+            {
+                if (!m_onAssetSelected)
+                {
+                    return;
+                }
+
+                if (!index.isValid() || m_contentModel->isDir(index))
+                {
+                    m_onAssetSelected(QString{});
+                    return;
+                }
+
+                const QString filePath = m_contentModel->filePath(index);
+                m_onAssetSelected(IsMaterialAssetFilePath(filePath) ? filePath : QString{});
+            });
+
         connect(m_contentListView, &QWidget::customContextMenuRequested, this,
             [this](const QPoint& position)
             {
@@ -353,6 +372,11 @@ namespace NexusEditor
         m_onSceneOpened = std::move(callback);
     }
 
+    void ContentDrawerWidget::SetAssetSelectedCallback(std::function<void(const QString&)> callback)
+    {
+        m_onAssetSelected = std::move(callback);
+    }
+
     void ContentDrawerWidget::SetAssetRenamedCallback(std::function<void(const QString&, const QString&)> callback)
     {
         m_onAssetRenamed = std::move(callback);
@@ -373,6 +397,11 @@ namespace NexusEditor
         m_contentListView->setRootIndex(contentIndex);
         m_currentFolderPath = resolvedPath;
         RebuildBreadcrumbs(resolvedPath);
+
+        if (m_onAssetSelected)
+        {
+            m_onAssetSelected(QString{});
+        }
     }
 
     void ContentDrawerWidget::RebuildBreadcrumbs(const QString& folderPath)
@@ -430,6 +459,7 @@ namespace NexusEditor
         QMenu menu(this);
         QMenu* createMenu = menu.addMenu(QStringLiteral("Create"));
         createMenu->addAction(QStringLiteral("Scene"), this, [this, folderPath]() { CreateSceneInDirectory(folderPath); });
+        createMenu->addAction(QStringLiteral("Material"), this, [this, folderPath]() { CreateMaterialInDirectory(folderPath); });
 
         if (index.isValid())
         {
@@ -451,6 +481,7 @@ namespace NexusEditor
         QMenu menu(this);
         QMenu* createMenu = menu.addMenu(QStringLiteral("New"));
         createMenu->addAction(QStringLiteral("Scene"), this, [this, targetDirectory]() { CreateSceneInDirectory(targetDirectory); });
+        createMenu->addAction(QStringLiteral("Material"), this, [this, targetDirectory]() { CreateMaterialInDirectory(targetDirectory); });
 
         if (index.isValid())
         {
@@ -471,6 +502,19 @@ namespace NexusEditor
         }
     }
 
+    void ContentDrawerWidget::CreateMaterialInDirectory(const QString& directoryPath)
+    {
+        const QString filePath = GetNextMaterialFilePath(directoryPath);
+        if (CreateEmptyMaterialFile(filePath, QFileInfo(filePath).completeBaseName()))
+        {
+            SetCurrentFolder(directoryPath);
+            if (m_onAssetSelected)
+            {
+                m_onAssetSelected(filePath);
+            }
+        }
+    }
+
     QString ContentDrawerWidget::GetNextSceneFilePath(const QString& directoryPath) const
     {
         const QString cleanDirectoryPath = QDir::cleanPath(directoryPath);
@@ -486,6 +530,26 @@ namespace NexusEditor
         {
             candidateFilePath = QDir(cleanDirectoryPath).filePath(
                 QStringLiteral("%1_%2.nscene").arg(baseName).arg(suffix++));
+        } while (QFileInfo::exists(candidateFilePath));
+
+        return candidateFilePath;
+    }
+
+    QString ContentDrawerWidget::GetNextMaterialFilePath(const QString& directoryPath) const
+    {
+        const QString cleanDirectoryPath = QDir::cleanPath(directoryPath);
+        const QString baseName = QStringLiteral("NewMaterial");
+        QString candidateFilePath = QDir(cleanDirectoryPath).filePath(baseName + QStringLiteral(".nmat"));
+        if (!QFileInfo::exists(candidateFilePath))
+        {
+            return candidateFilePath;
+        }
+
+        int suffix = 1;
+        do
+        {
+            candidateFilePath = QDir(cleanDirectoryPath).filePath(
+                QStringLiteral("%1_%2.nmat").arg(baseName).arg(suffix++));
         } while (QFileInfo::exists(candidateFilePath));
 
         return candidateFilePath;

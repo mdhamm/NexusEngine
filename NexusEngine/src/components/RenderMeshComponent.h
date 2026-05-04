@@ -1,14 +1,16 @@
 #pragma once
 
-#include "ComponentReflection.h"
+#include "MetadataRegistry.h"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
+#include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/ShaderResourceBinding.h>
 
 namespace NexusEngine
 {
     struct Mesh;
     struct Material;
+    struct RenderMeshComponent;
 
     // ECS component that binds a mesh and material to an entity for rendering.
     struct RenderMeshComponent
@@ -18,6 +20,9 @@ namespace NexusEngine
 
         // Shared material used to render the mesh.
         Material* material = nullptr;
+
+        // Material asset path used to resolve the runtime material instance.
+        std::string m_materialAssetPath;
 
         // Optional per-instance shader resource binding.
         Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> instanceSRB;
@@ -37,93 +42,27 @@ namespace NexusEngine
         // Render layer used for filtering and ordering.
         int renderLayer = 0; // For sorting/filtering
 
-        /// <summary>
-        /// Creates the editor reflection descriptor for the render mesh component.
-        /// </summary>
-        /// <returns>The render mesh component descriptor.</returns>
-        static ComponentDescriptor CreateDescriptor()
-        {
-            return ComponentDescriptor{
-                "RenderMeshComponent",
-                [](const flecs::entity& entity) { return entity.has<RenderMeshComponent>(); },
-                [](flecs::entity entity) { entity.set(RenderMeshComponent{}); },
-                [](const flecs::entity& entity)
-                {
-                    std::vector<ComponentPropertyDescriptor> properties;
-                    const auto* renderMesh = entity.get<RenderMeshComponent>();
-                    if (!renderMesh)
-                    {
-                        return properties;
-                    }
+    };
 
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Mesh",
-                        "string",
-                        ComponentPropertyValueType::String,
-                        true,
-                        [renderMesh](const flecs::entity&) { return renderMesh->mesh ? std::string("Assigned") : std::string("None"); },
-                        {} });
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Material",
-                        "string",
-                        ComponentPropertyValueType::String,
-                        true,
-                        [renderMesh](const flecs::entity&) { return renderMesh->material ? std::string("Assigned") : std::string("None"); },
-                        {} });
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Visible",
-                        "bool",
-                        ComponentPropertyValueType::Bool,
-                        false,
-                        [renderMesh](const flecs::entity&) { return renderMesh->visible ? std::string("true") : std::string("false"); },
-                        [](const flecs::entity& target, const std::string& text)
-                        {
-                            if (auto* editable = target.get_mut<RenderMeshComponent>())
-                            {
-                                editable->visible = text == "true";
-                            }
-                        } });
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Cast Shadows",
-                        "bool",
-                        ComponentPropertyValueType::Bool,
-                        false,
-                        [renderMesh](const flecs::entity&) { return renderMesh->castShadows ? std::string("true") : std::string("false"); },
-                        [](const flecs::entity& target, const std::string& text)
-                        {
-                            if (auto* editable = target.get_mut<RenderMeshComponent>())
-                            {
-                                editable->castShadows = text == "true";
-                            }
-                        } });
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Receive Shadows",
-                        "bool",
-                        ComponentPropertyValueType::Bool,
-                        false,
-                        [renderMesh](const flecs::entity&) { return renderMesh->receiveShadows ? std::string("true") : std::string("false"); },
-                        [](const flecs::entity& target, const std::string& text)
-                        {
-                            if (auto* editable = target.get_mut<RenderMeshComponent>())
-                            {
-                                editable->receiveShadows = text == "true";
-                            }
-                        } });
-                    properties.push_back(ComponentPropertyDescriptor{
-                        "Render Layer",
-                        "int",
-                        ComponentPropertyValueType::Int,
-                        false,
-                        [renderMesh](const flecs::entity&) { return std::to_string(renderMesh->renderLayer); },
-                        [](const flecs::entity& target, const std::string& text)
-                        {
-                            if (auto* editable = target.get_mut<RenderMeshComponent>())
-                            {
-                                editable->renderLayer = std::stoi(text);
-                            }
-                        } });
-                    return properties;
-                } };
+    template<>
+    struct ComponentMeta<RenderMeshComponent>
+    {
+        static void Register(flecs::world& world, MetadataRegistry& registry)
+        {
+            world.component<RenderMeshComponent>()
+                .member<std::string>("materialAssetPath")
+                .member<bool>("visible")
+                .member<bool>("castShadows")
+                .member<bool>("receiveShadows")
+                .member<int>("renderLayer");
+
+            registry.component<RenderMeshComponent>("RenderMeshComponent")
+                .field("Material Asset", &RenderMeshComponent::m_materialAssetPath)
+                    .assetType(AssetType::Material)
+                .field("Visible", &RenderMeshComponent::visible)
+                .field("Cast Shadows", &RenderMeshComponent::castShadows)
+                .field("Receive Shadows", &RenderMeshComponent::receiveShadows)
+                .field("Render Layer", &RenderMeshComponent::renderLayer);
         }
     };
 } // namespace NexusEngine

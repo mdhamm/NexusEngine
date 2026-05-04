@@ -31,6 +31,12 @@ namespace NexusEditor
         void SetSceneOpenedCallback(std::function<void(const QString&)> callback);
 
         /// <summary>
+        /// Sets the callback invoked when an asset is selected in the content drawer.
+        /// </summary>
+        /// <param name="callback">Callback receiving the selected asset path, or an empty string when selection clears.</param>
+        void SetAssetSelectedCallback(std::function<void(const QString&)> callback);
+
+        /// <summary>
         /// Sets the callback invoked when an asset is renamed or moved from the content drawer.
         /// </summary>
         /// <param name="callback">Callback receiving the old and new absolute asset paths.</param>
@@ -42,7 +48,9 @@ namespace NexusEditor
         void ShowFolderContextMenu(const QPoint& position);
         void ShowContentContextMenu(const QPoint& position);
         void CreateSceneInDirectory(const QString& directoryPath);
+        void CreateMaterialInDirectory(const QString& directoryPath);
         QString GetNextSceneFilePath(const QString& directoryPath) const;
+        QString GetNextMaterialFilePath(const QString& directoryPath) const;
         void RenameIndex(const QModelIndex& index);
         void DeleteIndex(const QModelIndex& index);
         bool IsSceneIndex(const QModelIndex& index) const;
@@ -57,6 +65,7 @@ namespace NexusEditor
         QListView* m_contentListView = nullptr;
         QString m_currentFolderPath;
         std::function<void(const QString&)> m_onSceneOpened;
+        std::function<void(const QString&)> m_onAssetSelected;
         std::function<void(const QString&, const QString&)> m_onAssetRenamed;
     };
 } // namespace NexusEditor

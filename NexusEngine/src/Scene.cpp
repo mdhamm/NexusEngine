@@ -1,6 +1,7 @@
 #include "Scene.h"
-#include "ComponentReflection.h"
+#include "MetadataRegistry.h"
 #include "components/CameraComponent.h"
+#include "components/EditorOnlyComponent.h"
 #include "components/FlyCameraComponent.h"
 #include "components/RenderMeshComponent.h"
 #include "components/TransformComponent.h"
@@ -22,7 +23,7 @@ namespace NexusEngine
 {
     namespace
     {
-        void RegisterBuiltinComponentDescriptors()
+        void RegisterBuiltinComponents(flecs::world& world)
         {
             static bool s_registered = false;
             if (s_registered)
@@ -30,11 +31,12 @@ namespace NexusEngine
                 return;
             }
 
-            auto& registry = ComponentReflectionRegistry::Instance();
-            registry.RegisterDescriptor(TransformComponent::CreateDescriptor());
-            registry.RegisterDescriptor(CameraComponent::CreateDescriptor());
-            registry.RegisterDescriptor(RenderMeshComponent::CreateDescriptor());
-            registry.RegisterDescriptor(FlyCameraComponent::CreateDescriptor());
+            MetadataRegistry& registry = MetadataRegistry::Instance();
+            RegisterComponent<TransformComponent>(world, registry);
+            RegisterComponent<CameraComponent>(world, registry);
+            RegisterComponent<RenderTextureComponent>(world, registry);
+            RegisterComponent<RenderMeshComponent>(world, registry);
+            RegisterComponent<FlyCameraComponent>(world, registry);
 
             s_registered = true;
         }
@@ -129,11 +131,7 @@ namespace NexusEngine
 
     void Scene::RegisterSceneComponents()
     {
-        RegisterBuiltinComponentDescriptors();
-        m_world.component<CameraComponent>();
-        m_world.component<RenderTextureComponent>();
-        m_world.component<RenderMeshComponent>();
-        m_world.component<TransformComponent>();
+        RegisterBuiltinComponents(m_world);
     }
 
     void Scene::RegisterPhases()
@@ -292,6 +290,20 @@ namespace NexusEngine
                     const float aspect = static_cast<float>(scDesc.Width) / static_cast<float>(scDesc.Height);
                     const auto rtvFormat = scDesc.ColorBufferFormat;
                     const auto dsvFormat = scDesc.DepthBufferFormat;
+                    const bool gameplayEnabled = m_world.has<GameplayEnabled>();
+                    const bool physicsEnabled = m_world.has<PhysicsEnabled>();
+                    const bool sceneModeEnabled = !gameplayEnabled && !physicsEnabled;
+                    const bool isEditorOnlyCamera = cameraEntity.has<EditorOnlyComponent>();
+
+                    if (sceneModeEnabled && !isEditorOnlyCamera)
+                    {
+                        return;
+                    }
+
+                    if (!sceneModeEnabled && isEditorOnlyCamera)
+                    {
+                        return;
+                    }
 
                     if (cam.m_target == CameraComponent::Target::SwapChain)
                     {

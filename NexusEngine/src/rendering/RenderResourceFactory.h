@@ -100,6 +100,7 @@ namespace NexusEngine
         /// <param name="inputLayout">Vertex input layout.</param>
         /// <param name="topology">Primitive topology.</param>
         /// <param name="cullMode">Face culling mode.</param>
+        /// <param name="isTransparent">Whether alpha blending is enabled.</param>
         /// <param name="depthTestEnabled">Whether depth testing is enabled.</param>
         /// <param name="depthWriteEnabled">Whether depth writes are enabled.</param>
         /// <param name="rtvFormat">Render target format.</param>
@@ -112,6 +113,7 @@ namespace NexusEngine
             const std::vector<Diligent::LayoutElement>& inputLayout,
             Diligent::PRIMITIVE_TOPOLOGY topology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
             Diligent::CULL_MODE cullMode = Diligent::CULL_MODE_BACK,
+            bool isTransparent = false,
             bool depthTestEnabled = true,
             bool depthWriteEnabled = true,
             Diligent::TEXTURE_FORMAT rtvFormat = Diligent::TEX_FORMAT_RGBA8_UNORM_SRGB,
@@ -148,6 +150,26 @@ namespace NexusEngine
             const char* psFilePath,
             const std::vector<Diligent::LayoutElement>& inputLayout,
             Diligent::PRIMITIVE_TOPOLOGY topology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+        /// <summary>
+        /// Creates a configurable surface material using the engine's default mesh input layout.
+        /// </summary>
+        /// <param name="name">Material name.</param>
+        /// <param name="vsFilePath">Vertex shader file path.</param>
+        /// <param name="psFilePath">Pixel shader file path.</param>
+        /// <param name="isTransparent">Whether alpha blending is enabled.</param>
+        /// <param name="cullMode">Face culling mode.</param>
+        /// <param name="depthTestEnabled">Whether depth testing is enabled.</param>
+        /// <param name="depthWriteEnabled">Whether depth writes are enabled.</param>
+        /// <returns>The created material, or null on failure.</returns>
+        Material* CreateSurfaceMaterialFromFiles(
+            const char* name,
+            const char* vsFilePath,
+            const char* psFilePath,
+            bool isTransparent,
+            Diligent::CULL_MODE cullMode,
+            bool depthTestEnabled,
+            bool depthWriteEnabled);
 
         /// <summary>
         /// Creates the default material used by the engine.

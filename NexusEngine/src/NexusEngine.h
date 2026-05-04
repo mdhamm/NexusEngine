@@ -9,6 +9,7 @@
 #endif // _WIN32
 
 #include "Scene.h"
+#include "SceneFileSerialization.h"
 #include "input/InputState.h"
 #include "rendering/GraphicsRenderer.h"
 

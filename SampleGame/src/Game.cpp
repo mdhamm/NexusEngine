@@ -1,6 +1,6 @@
 #include "Game.h"
 #include "GameComponents.h"
-#include <ComponentReflection.h>
+#include <MetadataRegistry.h>
 #include <Scene.h>
 #include <components/CameraComponent.h>
 #include <components/FlyCameraComponent.h>
@@ -100,7 +100,7 @@ namespace SampleGame
 
     namespace
     {
-        void RegisterComponentDescriptors()
+        void RegisterComponentMetadata(flecs::world& world)
         {
             static bool s_registered = false;
             if (s_registered)
@@ -108,9 +108,7 @@ namespace SampleGame
                 return;
             }
 
-            auto& registry = NexusEngine::ComponentReflectionRegistry::Instance();
-
-            registry.RegisterDescriptor(RotationSpeed::CreateDescriptor());
+            NexusEngine::RegisterComponent<RotationSpeed>(world, NexusEngine::MetadataRegistry::Instance());
 
             s_registered = true;
         }
@@ -121,14 +119,10 @@ namespace SampleGame
     public:
         void OnStartup(NexusEngine::Engine& engine) override
         {
-            RegisterComponentDescriptors();
-
             auto& scene = engine.CreateScene("MainScene");
             engine.SetActiveScene("MainScene");
             auto& w = scene.m_world;
-
-            // Register components
-            w.component<RotationSpeed>().member<float>("x").member<float>("y").member<float>("z");
+            RegisterComponentMetadata(w);
 
 #if !defined(__EMSCRIPTEN__)
             SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -272,7 +266,8 @@ namespace SampleGame
 
             // System to rotate objects with RotationSpeed component
             w.system<NexusEngine::TransformComponent, RotationSpeed>("RotateObjects")
-                .kind(flecs::OnUpdate)
+                .kind<NexusEngine::GameplayPhase>()
+                .term<NexusEngine::GameplayEnabled>()
                 .iter(
                     [](flecs::iter& it, NexusEngine::TransformComponent* transforms, RotationSpeed* speeds)
                     {
@@ -305,7 +300,8 @@ namespace SampleGame
                     });
 
             w.system<>("PrintFps")
-                .kind(flecs::OnUpdate)
+                .kind<NexusEngine::GameplayPhase>()
+                .term<NexusEngine::GameplayEnabled>()
                 .iter(
                     [](flecs::iter& it)
                     {
@@ -335,6 +331,6 @@ namespace SampleGame
 
     void RegisterEditorComponentDescriptors()
     {
-        RegisterComponentDescriptors();
+        // Sample game metadata registration now happens per-world during startup.
     }
 } // namespace SampleGame

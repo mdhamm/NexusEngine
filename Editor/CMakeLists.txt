@@ -48,6 +48,8 @@ else()
     src/EditorProject.h
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
+    src/EditorMaterialSerializer.cpp
+    src/EditorMaterialSerializer.h
     src/EditorSceneApp.cpp
     src/EditorSceneApp.h
     src/EditorSceneSerializer.cpp
