@@ -192,7 +192,6 @@ namespace NexusEngine
 
     Scene::~Scene()
     {
-        // Cleanup happens automatically with unique_ptr
     }
 
     void Scene::Update(float dt)
@@ -240,21 +239,6 @@ namespace NexusEngine
         const auto entitiesIt = document.find("entities");
 
         scene.m_name = document.value("name", std::string{}).empty() ? filePath.stem().string() : document.value("name", std::string{});
-
-        std::vector<flecs::entity> existingEntities;
-        scene.m_world.each<TransformComponent>(
-            [&](flecs::entity entity, TransformComponent&)
-            {
-                if (entity.is_valid() && entity.is_alive())
-                {
-                    existingEntities.push_back(entity);
-                }
-            });
-
-        for (const flecs::entity& entity : existingEntities)
-        {
-            scene.DestroyEntity(entity);
-        }
 
         struct PendingEntity
         {

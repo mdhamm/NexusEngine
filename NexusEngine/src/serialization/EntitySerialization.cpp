@@ -82,8 +82,6 @@ namespace NexusEngine
 
     bool DeserializeField(std::string& fieldName, std::string& fieldValue, ISerializeReader& reader)
     {
-        fieldName.clear();
-        fieldValue.clear();
         reader.Read("name", fieldName);
         reader.Read("value", fieldValue);
         return !fieldName.empty();
