@@ -64,4 +64,36 @@ namespace NexusEngine::IO
     {
         return WriteFileBytes(filePath, bytes.data(), bytes.size());
     }
+
+    bool WriteSerializedFile(const std::filesystem::path& filePath, const SerializeToBytesMethod& serializeMethod)
+    {
+        if (!serializeMethod)
+        {
+            return false;
+        }
+
+        std::vector<std::uint8_t> bytes;
+        if (!serializeMethod(bytes))
+        {
+            return false;
+        }
+
+        return WriteFileBytes(filePath, bytes);
+    }
+
+    bool ReadSerializedFile(const std::filesystem::path& filePath, const DeserializeFromBytesMethod& deserializeMethod)
+    {
+        if (!deserializeMethod)
+        {
+            return false;
+        }
+
+        const std::optional<std::vector<std::uint8_t>> bytes = ReadFileBytes(filePath);
+        if (!bytes)
+        {
+            return false;
+        }
+
+        return deserializeMethod(*bytes);
+    }
 } // namespace NexusEngine::IO

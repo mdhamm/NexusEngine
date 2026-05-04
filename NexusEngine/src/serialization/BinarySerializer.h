@@ -1,4 +1,3 @@
-// BinarySerializer.h
 #pragma once
 
 #include "ISerializer.h"
@@ -67,4 +66,4 @@ namespace NexusEngine
         void ReadStringRaw(std::string& value);
         void ReadAndDiscardName(std::string_view expectedName);
     };
-}
+} // namespace NexusEngine

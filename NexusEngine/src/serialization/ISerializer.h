@@ -1,4 +1,3 @@
-// ISerializer.h
 #pragma once
 
 #include <string>
@@ -54,4 +53,4 @@ namespace NexusEngine
         virtual void Read(std::string_view name, uint64_t& value) = 0;
         virtual void Read(std::string_view name, std::string& value) = 0;
     };
-}
+} // namespace NexusEngine

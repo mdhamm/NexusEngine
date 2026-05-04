@@ -2,10 +2,6 @@
 
 #include "ComponentAccess.h"
 #include "MetadataRegistry.h"
-#include "common/io/FileIO.h"
-#include "serialization/EntitySerialization.h"
-#include "serialization/SceneSerialization.h"
-#include "serialization/JsonSerializer.h"
 #include "components/CameraComponent.h"
 #include "components/EditorOnlyComponent.h"
 #include "components/FlyCameraComponent.h"
@@ -15,8 +11,6 @@
 #include "rendering/Material.h"
 #include "rendering/RenderResourceFactory.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
@@ -25,8 +19,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <optional>
-#include <unordered_map>
 #include <NexusEngine.cpp>
 
 using namespace Diligent;
@@ -34,8 +26,6 @@ namespace NexusEngine
 {
     namespace
     {
-        using json = nlohmann::json;
-
         void RegisterBuiltinComponents(flecs::world& world)
         {
             static bool s_registered = false;
@@ -52,23 +42,6 @@ namespace NexusEngine
             RegisterComponent<FlyCameraComponent>(world, registry);
 
             s_registered = true;
-        }
-
-        std::string Trim(std::string_view text)
-        {
-            size_t start = 0;
-            size_t end = text.size();
-            while (start < end && std::isspace(static_cast<unsigned char>(text[start])) != 0)
-            {
-                ++start;
-            }
-
-            while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0)
-            {
-                --end;
-            }
-
-            return std::string(text.substr(start, end - start));
         }
 
         void AssignDefaultRenderResources(Scene& scene)
@@ -197,124 +170,6 @@ namespace NexusEngine
     void Scene::Update(float dt)
     {
         m_world.progress(dt);
-    }
-
-    bool SaveSceneToFile(const Scene& scene, const std::filesystem::path& filePath)
-    {
-        json sceneJson;
-        JsonSerializeWriter writer(sceneJson);
-
-        SerializeScene(scene, writer);
-
-        const std::string text = sceneJson.dump(4) + '\n';
-        return IO::WriteFileBytes(
-            filePath,
-            reinterpret_cast<const std::uint8_t*>(text.data()),
-            text.size());
-    }
-
-    bool LoadSceneFromFile(Scene& scene, const std::filesystem::path& filePath)
-    {
-        const std::optional<std::vector<std::uint8_t>> fileBytes = IO::ReadFileBytes(filePath);
-        if (!fileBytes)
-        {
-            return false;
-        }
-
-        json document;
-        try
-        {
-            document = json::parse(fileBytes->begin(), fileBytes->end());
-        }
-        catch (...)
-        {
-            return false;
-        }
-
-        if (!document.is_object())
-        {
-            return false;
-        }
-
-        const auto entitiesIt = document.find("entities");
-
-        scene.m_name = document.value("name", std::string{}).empty() ? filePath.stem().string() : document.value("name", std::string{});
-
-        struct PendingEntity
-        {
-            flecs::entity m_entity;
-            std::uint64_t m_parentId = 0;
-        };
-
-        std::unordered_map<std::uint64_t, PendingEntity> pendingEntities;
-
-        if (entitiesIt != document.end() && entitiesIt->is_array())
-        {
-            pendingEntities.reserve(entitiesIt->size());
-
-            JsonSerializeReader reader(document);
-            const std::size_t entityCount = reader.GetArraySize("entities");
-            reader.BeginArray("entities");
-            for (std::size_t entityIndex = 0; entityIndex < entityCount; ++entityIndex)
-            {
-                reader.BeginArrayElement(entityIndex);
-
-                SerializedEntityHeader header;
-                if (DeserializeEntityHeader(header, reader))
-                {
-                    PendingEntity pendingEntity;
-                    pendingEntity.m_entity = header.m_name.empty()
-                        ? scene.CreateEntity()
-                        : scene.CreateEntity(header.m_name.c_str());
-                    pendingEntity.m_parentId = header.m_parentId;
-                    pendingEntities.emplace(header.m_id, std::move(pendingEntity));
-                }
-
-                reader.EndArrayElement();
-            }
-            reader.EndArray();
-        }
-
-        if (entitiesIt != document.end() && entitiesIt->is_array())
-        {
-            JsonSerializeReader reader(document);
-            const std::size_t entityCount = reader.GetArraySize("entities");
-            reader.BeginArray("entities");
-            for (std::size_t entityIndex = 0; entityIndex < entityCount; ++entityIndex)
-            {
-                reader.BeginArrayElement(entityIndex);
-
-                std::uint64_t originalId = 0;
-                reader.Read("id", originalId);
-
-                const auto pendingIt = pendingEntities.find(originalId);
-                if (pendingIt != pendingEntities.end())
-                {
-                    (void)DeserializeEntity(pendingIt->second.m_entity, reader);
-                }
-
-                reader.EndArrayElement();
-            }
-            reader.EndArray();
-        }
-
-        for (auto& [originalId, pendingEntity] : pendingEntities)
-        {
-            (void)originalId;
-            if (pendingEntity.m_parentId == 0)
-            {
-                continue;
-            }
-
-            const auto parentIt = pendingEntities.find(pendingEntity.m_parentId);
-            if (parentIt != pendingEntities.end())
-            {
-                pendingEntity.m_entity.child_of(parentIt->second.m_entity);
-            }
-        }
-
-        AssignDefaultRenderResources(scene);
-        return true;
     }
 
     void Scene::RegisterSceneComponents()

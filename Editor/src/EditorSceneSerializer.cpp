@@ -1,7 +1,8 @@
 #include "EditorSceneSerializer.h"
 
-#include <common/io/AssetGuid.h>
-#include <common/io/FileIO.h>
+#include <io/AssetGuid.h>
+#include <io/FileIO.h>
+#include <io/SceneIO.h>
 #include <serialization/SceneSerialization.h>
 #include <serialization/JsonSerializer.h>
 
@@ -10,6 +11,7 @@
 #include <QFileInfo>
 
 #include <cctype>
+#include <sstream>
 #include <filesystem>
 #include <optional>
 #include <string_view>
@@ -51,12 +53,60 @@ namespace NexusEditor
 
     bool SaveSceneToFile(const NexusEngine::Scene& scene, const QString& filePath)
     {
-        return NexusEngine::SaveSceneToFile(scene, ToFilesystemPath(filePath));
+        return NexusEngine::IO::SaveSceneToFile(
+            scene,
+            ToFilesystemPath(filePath),
+            [](const NexusEngine::Scene& sourceScene, NexusEngine::ISerializeWriter& writer)
+            {
+                NexusEngine::SerializeScene(sourceScene, writer);
+                return true;
+            },
+            [](std::vector<std::uint8_t>& bytes, const NexusEngine::Scene& sourceScene, const NexusEngine::SerializeSceneMethod& serializeMethod)
+            {
+                json sceneJson;
+                NexusEngine::JsonSerializeWriter writer(sceneJson);
+                writer.BeginObject();
+
+                if (!serializeMethod(sourceScene, writer))
+                {
+                    return false;
+                }
+
+                const std::string text = sceneJson.dump(4) + '\n';
+                bytes.assign(text.begin(), text.end());
+                return true;
+            });
     }
 
     bool LoadSceneFromFile(NexusEngine::Scene& scene, const QString& filePath)
     {
-        return NexusEngine::LoadSceneFromFile(scene, ToFilesystemPath(filePath));
+        return NexusEngine::IO::LoadSceneFromFile(
+            scene,
+            ToFilesystemPath(filePath),
+            [](NexusEngine::Scene& destinationScene, NexusEngine::ISerializeReader& reader)
+            {
+                return NexusEngine::DeserializeScene(destinationScene, reader);
+            },
+            [](const std::vector<std::uint8_t>& bytes, NexusEngine::Scene& destinationScene, const NexusEngine::DeserializeSceneMethod& deserializeMethod)
+            {
+                json document;
+                try
+                {
+                    document = json::parse(bytes.begin(), bytes.end());
+                }
+                catch (...)
+                {
+                    return false;
+                }
+
+                if (!document.is_object())
+                {
+                    return false;
+                }
+
+                NexusEngine::JsonSerializeReader reader(document);
+                return deserializeMethod(destinationScene, reader);
+            });
     }
 
     bool CreateEmptySceneFile(const QString& filePath, const QString& sceneName)
