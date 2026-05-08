@@ -3,11 +3,7 @@
 #include "EditorWindow.h"
 #include "EditorSceneSerializer.h"
 
-#include <QKeyEvent>
-#include <QMouseEvent>
-#include <QShowEvent>
 #include <QTimer>
-#include <QWheelEvent>
 
 #include <algorithm>
 

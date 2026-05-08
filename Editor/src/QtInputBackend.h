@@ -3,8 +3,6 @@
 #include "input/InputState.h"
 
 #include <QKeyEvent>
-#include <QMouseEvent>
-#include <QWheelEvent>
 #include <optional>
 
 namespace NexusEditor

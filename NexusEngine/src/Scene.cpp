@@ -240,7 +240,6 @@ namespace NexusEngine
                 [engine = m_engine](flecs::iter& it, TransformComponent* transforms, FlyCameraComponent* controllers, CameraComponent*)
                 {
                     const float dt = static_cast<float>(it.delta_time());
-                    const Uint8* keyboardState = SDL_GetKeyboardState(nullptr);
                     int mouseDeltaX = 0;
                     int mouseDeltaY = 0;
 

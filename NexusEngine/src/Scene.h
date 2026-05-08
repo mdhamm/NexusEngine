@@ -1,6 +1,6 @@
 #pragma once
-#include <flecs.h>
 
+#include <flecs.h>
 #include <string>
 #include <vector>
 #include <memory>

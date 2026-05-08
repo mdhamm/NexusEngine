@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cassert>
-#include <cmath>
-
 #include "reflection/EntityReflection.h"
 
-#include <flecs.h>
+#include <cassert>
+#include <cmath>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
+#include <flecs.h>
 
 namespace NexusEngine
 {
@@ -159,11 +158,9 @@ namespace NexusEngine
             const float m01 = 2.0f * (xy - wz);
             const float m02 = 2.0f * (xz + wy);
 
-            const float m10 = 2.0f * (xy + wz);
             const float m11 = 1.0f - 2.0f * (xx + zz);
             const float m12 = 2.0f * (yz - wx);
 
-            const float m20 = 2.0f * (xz - wy);
             const float m21 = 2.0f * (yz + wx);
             const float m22 = 1.0f - 2.0f * (xx + yy);
 

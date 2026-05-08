@@ -1,7 +1,9 @@
 #include "NexusEngine.h"
-#include "Scene.h"
 
-//#include <backends/imgui_impl_sdl2.h>
+#include "ProjectSettings.h"
+#include "Scene.h"
+#include "filesystem/FileIO.h"
+#include "serialization/ProjectSettingsSerialization.h"
 
 #include <chrono>
 #include <algorithm>
@@ -10,24 +12,31 @@ using namespace Diligent;
 
 namespace NexusEngine
 {
-    // --------------------------------------------------------------
-    // Initialization / Shutdown
-    // --------------------------------------------------------------
-
     bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectFile)
     {
         // Initialize project context
         m_projectContext.m_projectFile = projectFile;
         // Read the file to get the root
-        // It should be in json format with a "root" field that contains the root path
+        ProjectSettings projectSettings;
+        if (IO::LoadFromFile(projectSettings, projectFile, IO::FileFormat::Json))
+        {
+            m_projectContext.m_projectRoot = projectSettings.m_rootPath;
+        }
+        else
+        {
+            // If the file can't be read, use the parent directory of the project file as the root
+            m_projectContext.m_projectRoot = projectFile.parent_path();
+        }
 
-
+        // Store game instance
         assert(game);
         if (!game)
         {
             return false;
         }
         m_game = game.release();
+
+        // Initialize graphics renderer
         bool graphicsInitialized = m_graphicsRenderer.CreateDeviceAndSwapchain(win);
         m_initialized = graphicsInitialized;
         return graphicsInitialized;
@@ -90,10 +99,6 @@ namespace NexusEngine
         }
     }
 
-    // --------------------------------------------------------------
-    // Scene Management
-    // --------------------------------------------------------------
-
     Scene& Engine::CreateScene(const std::string& name)
     {
         auto s = std::make_unique<Scene>(m_graphicsRenderer, *this, name);
@@ -141,10 +146,6 @@ namespace NexusEngine
 
         m_graphicsRenderer.ResizeSwapchain(width, height);
     }
-
-    // --------------------------------------------------------------
-    // Main Tick / Frame Loop
-    // --------------------------------------------------------------
 
     void Engine::Tick(float dt)
     {

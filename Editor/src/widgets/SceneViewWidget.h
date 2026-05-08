@@ -12,8 +12,6 @@
 #include <chrono>
 #include <functional>
 
-#include "QtInputBackend.h"
-
 namespace NexusEditor
 {
     class EditorWindow;

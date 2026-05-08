@@ -178,8 +178,8 @@ namespace SampleGame
                                         (static_cast<float>(z) - static_cast<float>(CubeCountZ) * 0.5f) * Spacing),
                                     NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
                                     Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)))
-                                .set(NexusEngine::RenderMeshComponent{});
-                                //.set(RotationSpeed{ rx, ry, rz });
+                                .set(NexusEngine::RenderMeshComponent{})
+                                .set(RotationSpeed{ rx, ry, rz });
 
                             auto* noiseRenderMesh = noiseCube.get_mut<NexusEngine::RenderMeshComponent>();
                             noiseRenderMesh->mesh = cubeMesh;

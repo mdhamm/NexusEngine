@@ -1,8 +1,6 @@
 #include "EditorMaterialSerializer.h"
 
 #include <QDir>
-#include <QFile>
-#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 

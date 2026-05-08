@@ -5,9 +5,7 @@
 
 #include <filesystem/AssetReferenceRegistry.h>
 #include <QDir>
-#include <QDirIterator>
 #include <QDropEvent>
-#include <QFileInfo>
 #include <QFileSystemModel>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -15,10 +13,8 @@
 #include <QListView>
 #include <QMenu>
 #include <QPushButton>
-#include <QSizePolicy>
 #include <QSplitter>
 #include <QTreeView>
-#include <QVBoxLayout>
 
 namespace NexusEditor
 {

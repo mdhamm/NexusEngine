@@ -2,8 +2,6 @@
 
 #include "EditorProject.h"
 
-#include <QVector>
-
 namespace NexusEditor
 {
     class EditorProjectRegistry

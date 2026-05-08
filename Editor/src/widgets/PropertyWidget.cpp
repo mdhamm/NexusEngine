@@ -8,13 +8,9 @@
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QSignalBlocker>
-#include <QString>
-#include <QVBoxLayout>
 
 #ifdef emit
 #undef emit
@@ -28,7 +24,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
-#include <vector>
 
 namespace NexusEditor
 {

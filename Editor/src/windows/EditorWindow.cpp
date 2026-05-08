@@ -19,10 +19,8 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
-#include <QFileInfo>
 #include <QMenuBar>
 #include <QStatusBar>
-#include <QTabWidget>
 #include <QVBoxLayout>
 
 #ifdef emit

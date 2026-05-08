@@ -12,9 +12,7 @@
 
 #include <cctype>
 #include <filesystem>
-#include <optional>
 #include <string_view>
-#include <vector>
 
 namespace NexusEditor
 {
