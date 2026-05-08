@@ -57,7 +57,7 @@ namespace NexusEngine
         }
     }
 
-    void SerializeScene(const Scene& scene, ISerializeWriter& writer)
+    void Serialize(const Scene& scene, ISerializeWriter& writer)
     {
         writer.Write("name", scene.m_name);
         writer.BeginArray("entities");
@@ -77,7 +77,7 @@ namespace NexusEngine
         writer.EndObject();
     }
 
-    bool DeserializeScene(Scene& scene, ISerializeReader& reader)
+    bool Deserialize(Scene& scene, ISerializeReader& reader)
     {
         reader.Read("name", scene.m_name);
 

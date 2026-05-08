@@ -3,8 +3,8 @@
 #include <filesystem/AssetReferenceRegistry.h>
 #include <filesystem/AssetGuid.h>
 #include <filesystem/FileIO.h>
-#include <filesystem/SceneIO.h>
 #include <serialization/JsonSerializer.h>
+#include <serialization/SceneSerialization.h>
 
 #include <nlohmann/json.hpp>
 
@@ -47,12 +47,12 @@ namespace NexusEditor
 
     bool SaveSceneToFile(const NexusEngine::Scene& scene, const QString& filePath)
     {
-        return NexusEngine::IO::SaveSceneToFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
+        return NexusEngine::IO::SaveToFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
     }
 
     bool LoadSceneFromFile(NexusEngine::Scene& scene, const QString& filePath)
     {
-        return NexusEngine::IO::LoadSceneFromFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
+        return NexusEngine::IO::LoadFromFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
     }
 
     bool CreateEmptySceneFile(const QString& filePath, const QString& sceneName)
