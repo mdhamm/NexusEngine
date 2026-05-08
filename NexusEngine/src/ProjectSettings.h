@@ -3,8 +3,11 @@
 #include <string>
 #include <filesystem>
 
-struct ProjectSettings
+namespace NexusEngine
 {
-    std::string m_name;
-    std::filesystem::path m_rootPath;
-};
+    struct ProjectSettings
+    {
+        std::string m_name;
+        std::filesystem::path m_rootPath;
+    };
+} // namespace NexusEngine

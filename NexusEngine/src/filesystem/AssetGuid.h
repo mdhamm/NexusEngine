@@ -9,4 +9,4 @@ namespace NexusEngine::IO
     /// </summary>
     /// <returns>A newly generated asset guid.</returns>
     std::string CreateAssetGuid();
-}
+} // namespace NexusEngine::IO
