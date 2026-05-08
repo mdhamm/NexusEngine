@@ -9,7 +9,7 @@ namespace NexusEngine
     void Serialize(const ProjectSettings& project, NexusEngine::ISerializeWriter& writer)
     {
         writer.Write("name", project.m_name);
-        writer.Write("rootPath", project.m_rootPath.generic_string());
+        writer.Write("defaultScene", project.m_defaultScene.m_guid);
         writer.EndObject();
     }
 
@@ -18,11 +18,8 @@ namespace NexusEngine
         project = {};
 
         reader.Read("name", project.m_name);
+        reader.Read("defaultScene", project.m_defaultScene.m_guid);
 
-        std::string rootPath;
-        reader.Read("rootPath", rootPath);
-        project.m_rootPath = rootPath;
-
-        return !project.m_name.empty() && !rootPath.empty();
+        return !project.m_name.empty();
     }
 } // namespace NexusEngine

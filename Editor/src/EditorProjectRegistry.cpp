@@ -1,5 +1,6 @@
 #include "EditorProjectRegistry.h"
 
+#include <ProjectSettings.h>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -24,7 +25,6 @@ namespace NexusEditor
                 QJsonObject projectObject;
                 projectObject[QStringLiteral("name")] = project.m_name;
                 projectObject[QStringLiteral("rootPath")] = project.m_rootPath;
-                projectObject[QStringLiteral("projectFilePath")] = project.m_projectFilePath;
                 projectArray.append(projectObject);
             }
 
@@ -67,14 +67,8 @@ namespace NexusEditor
             EditorProject project;
             project.m_name = projectObject[QStringLiteral("name")].toString();
             project.m_rootPath = projectObject[QStringLiteral("rootPath")].toString();
-            project.m_projectFilePath = projectObject[QStringLiteral("projectFilePath")].toString();
 
-            if (project.m_projectFilePath.isEmpty())
-            {
-                project.m_projectFilePath = GetProjectFilePath(project.m_rootPath);
-            }
-
-            if (!project.m_rootPath.isEmpty() && QFileInfo::exists(project.m_rootPath) && QFileInfo::exists(project.m_projectFilePath))
+            if (!project.m_rootPath.isEmpty() && QFileInfo::exists(project.m_rootPath))
             {
                 projects.push_back(project);
             }
@@ -98,22 +92,10 @@ namespace NexusEditor
 
         project.m_name = projectName.trimmed();
         project.m_rootPath = QDir::cleanPath(projectRootPath);
-        project.m_projectFilePath = GetProjectFilePath(project.m_rootPath);
 
-        QFile file(project.m_projectFilePath);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        {
-            return false;
-        }
-
-        QJsonObject projectObject;
-        projectObject[QStringLiteral("name")] = project.m_name;
-        projectObject[QStringLiteral("rootPath")] = project.m_rootPath;
-        file.write(QJsonDocument(projectObject).toJson(QJsonDocument::Indented));
-        if (file.error() != QFileDevice::NoError)
-        {
-            return false;
-        }
+        NexusEngine::ProjectSettings projectSettings{};
+        projectSettings.m_name = project.m_name.toStdString();
+        projectSettings.m_defaultScene = NexusEngine::IO::AssetReference{}; // No default scene
 
         return AddRecentProject(project);
     }

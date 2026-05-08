@@ -12,21 +12,10 @@ using namespace Diligent;
 
 namespace NexusEngine
 {
-    bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectFile)
+    bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectRoot)
     {
         // Initialize project context
-        m_projectContext.m_projectFile = projectFile;
-        // Read the file to get the root
-        ProjectSettings projectSettings;
-        if (IO::LoadFromFile(projectSettings, projectFile, IO::FileFormat::Json))
-        {
-            m_projectContext.m_projectRoot = projectSettings.m_rootPath;
-        }
-        else
-        {
-            // If the file can't be read, use the parent directory of the project file as the root
-            m_projectContext.m_projectRoot = projectFile.parent_path();
-        }
+        m_projectContext.m_projectRoot = projectRoot;
 
         // Store game instance
         assert(game);

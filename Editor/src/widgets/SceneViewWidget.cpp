@@ -45,11 +45,6 @@ namespace NexusEditor
         return m_editorWindow ? m_editorWindow->GetActiveScene() : nullptr;
     }
 
-    bool SceneViewWidget::IsInitialized() const
-    {
-        return m_editorWindow && m_editorWindow->IsEngineInitialized();
-    }
-
     bool SceneViewWidget::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
     {
         return m_editorWindow && m_editorWindow->SaveActiveScene(filePath, assetGuid);
@@ -84,10 +79,6 @@ namespace NexusEditor
     void SceneViewWidget::showEvent(QShowEvent* event)
     {
         QWidget::showEvent(event);
-        if (m_editorWindow)
-        {
-            m_editorWindow->EnsureEngineInitialized();
-        }
     }
 
     void SceneViewWidget::resizeEvent(QResizeEvent* event)
@@ -97,11 +88,6 @@ namespace NexusEditor
         if (!m_editorWindow)
         {
             return;
-        }
-
-        if (!m_editorWindow->IsEngineInitialized())
-        {
-            m_editorWindow->EnsureEngineInitialized();
         }
 
         m_editorWindow->ResizeSceneViewport(width(), height());
@@ -174,12 +160,6 @@ namespace NexusEditor
     void SceneViewWidget::TickFrame()
     {
         if (!m_editorWindow)
-        {
-            return;
-        }
-
-        m_editorWindow->EnsureEngineInitialized();
-        if (!m_editorWindow->IsEngineInitialized())
         {
             return;
         }

@@ -52,7 +52,7 @@ namespace NexusEditor
             {
                 static std::uint64_t s_entityCounter = 1;
 
-                if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+                if (!m_editorWindow)
                 {
                     return;
                 }
@@ -94,7 +94,7 @@ namespace NexusEditor
     {
         m_treeWidget->clear();
 
-        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        if (!m_editorWindow)
         {
             m_treeWidget->addTopLevelItem(new QTreeWidgetItem(QStringList{ QStringLiteral("Initializing scene...") }));
             return;

@@ -1,13 +1,14 @@
 #pragma once
 
+#include "filesystem/AssetReference.h"
+
 #include <string>
-#include <filesystem>
 
 namespace NexusEngine
 {
     struct ProjectSettings
     {
         std::string m_name;
-        std::filesystem::path m_rootPath;
+        IO::AssetReference m_defaultScene;
     };
 } // namespace NexusEngine

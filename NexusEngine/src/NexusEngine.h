@@ -46,8 +46,9 @@ namespace NexusEngine
 
     struct ProjectContext
     {
-        std::filesystem::path m_projectFile;
         std::filesystem::path m_projectRoot;
+
+        std::filesystem::path GetAssetReferenceDirectory() const { return m_projectRoot / ".nexus" / "assetrefs"; }
     };
 
     // Main engine entry point that owns rendering and scene lifetime.
@@ -59,9 +60,9 @@ namespace NexusEngine
         /// </summary>
         /// <param name="win">Native window description used for renderer startup.</param>
         /// <param name="game">Game implementation owned by the engine.</param>
-        /// <param name="context">Project context containing paths and configuration.</param>
+        /// <param name="projectRoot">Root directory of the current project, used for asset loading.</param>
         /// <returns>True if initialization succeeds; otherwise false.</returns>
-        bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectFile);
+        bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectRoot);
 
         /// <summary>
         /// Releases engine-owned resources and shuts the game down.

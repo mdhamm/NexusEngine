@@ -8,6 +8,5 @@ namespace NexusEditor
     {
         QString m_name;
         QString m_rootPath;
-        QString m_projectFilePath;
     };
 } // namespace NexusEditor

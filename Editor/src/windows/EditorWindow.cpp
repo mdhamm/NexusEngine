@@ -65,7 +65,7 @@ namespace NexusEditor
         m_sceneFileReference = NexusEngine::IO::AssetReferenceFromPath(ToStdString(QDir(m_project.m_rootPath).filePath(QStringLiteral("EditorScene.nscene"))));
         BuildMenus();
         BuildLayout();
-        EnsureEngineInitialized();
+        InitializeEngine();
         SetSceneMode(true);
         statusBar()->showMessage(QStringLiteral("Ready - %1").arg(m_project.m_rootPath));
     }
@@ -80,14 +80,9 @@ namespace NexusEditor
         return m_engine.ActiveScene();
     }
 
-    bool EditorWindow::IsEngineInitialized() const
-    {
-        return m_isEngineInitialized;
-    }
-
     bool EditorWindow::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
     {
-        if (!m_isEngineInitialized || filePath.isEmpty())
+        if (filePath.isEmpty())
         {
             return false;
         }
@@ -98,8 +93,7 @@ namespace NexusEditor
 
     bool EditorWindow::LoadScene(const QString& filePath)
     {
-        EnsureEngineInitialized();
-        if (!m_isEngineInitialized || filePath.isEmpty())
+        if (filePath.isEmpty())
         {
             return false;
         }
@@ -118,12 +112,6 @@ namespace NexusEditor
 
     void EditorWindow::TickEngineFrame(float deltaSeconds)
     {
-        EnsureEngineInitialized();
-        if (!m_isEngineInitialized)
-        {
-            return;
-        }
-
         if (m_sceneView)
         {
             ResizeSceneViewport(m_sceneView->width(), m_sceneView->height());
@@ -146,12 +134,6 @@ namespace NexusEditor
 
     void EditorWindow::ResizeSceneViewport(int width, int height)
     {
-        EnsureEngineInitialized();
-        if (!m_isEngineInitialized)
-        {
-            return;
-        }
-
         m_engine.ResizeOutput(width, height);
     }
 
@@ -373,9 +355,9 @@ namespace NexusEditor
             });
     }
 
-    void EditorWindow::EnsureEngineInitialized()
+    void EditorWindow::InitializeEngine()
     {
-        if (m_isEngineInitialized || !m_sceneView)
+        if (!m_sceneView)
         {
             return;
         }
@@ -393,17 +375,12 @@ namespace NexusEditor
         nativeWindow.m_height = std::max(1, m_sceneView->height());
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
 
-        m_isEngineInitialized = m_engine.Initialize(nativeWindow, std::move(game), "");
+        m_engine.Initialize(nativeWindow, std::move(game), m_project.m_rootPath.toStdString());
     }
 
     void EditorWindow::SetSceneMode(bool isSceneMode)
     {
         m_isSceneMode = isSceneMode;
-
-        if (!m_isEngineInitialized)
-        {
-            return;
-        }
 
         if (NexusEngine::Scene* activeScene = m_engine.ActiveScene())
         {

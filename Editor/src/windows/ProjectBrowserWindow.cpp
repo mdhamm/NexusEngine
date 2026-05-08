@@ -9,10 +9,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QListWidgetItem>
 #include <QPushButton>
-#include <QVBoxLayout>
-#include <QWidget>
 
 namespace NexusEditor
 {
@@ -137,7 +134,6 @@ namespace NexusEditor
             auto* item = new QListWidgetItem(QStringLiteral("%1\n%2").arg(project.m_name, project.m_rootPath), m_projectList);
             item->setData(Qt::UserRole, project.m_name);
             item->setData(Qt::UserRole + 1, project.m_rootPath);
-            item->setData(Qt::UserRole + 2, project.m_projectFilePath);
         }
 
         if (m_projectList->count() > 0)
@@ -157,7 +153,6 @@ namespace NexusEditor
         EditorProject project;
         project.m_name = item->data(Qt::UserRole).toString();
         project.m_rootPath = item->data(Qt::UserRole + 1).toString();
-        project.m_projectFilePath = item->data(Qt::UserRole + 2).toString();
 
         EditorProjectRegistry::AddRecentProject(project);
         m_onProjectOpened(project);

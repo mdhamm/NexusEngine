@@ -82,7 +82,7 @@ namespace NexusEditor
 
         connect(m_addComponentButton, &QPushButton::clicked, this, [this]()
             {
-                if (!m_editorWindow || !m_editorWindow->IsEngineInitialized() || m_selectedEntityId == 0)
+                if (!m_editorWindow || m_selectedEntityId == 0)
                 {
                     return;
                 }
@@ -199,7 +199,7 @@ namespace NexusEditor
 
     QString PropertyWidget::CaptureStructureSignature() const
     {
-        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        if (!m_editorWindow)
         {
             return QStringLiteral("state:initializing");
         }
@@ -351,7 +351,7 @@ namespace NexusEditor
 
     void PropertyWidget::SyncDisplayedValues()
     {
-        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        if (!m_editorWindow)
         {
             return;
         }
@@ -437,7 +437,7 @@ namespace NexusEditor
     {
         ClearLayout(m_contentLayout);
 
-        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized())
+        if (!m_editorWindow)
         {
             m_contentLayout->addWidget(new QLabel(QStringLiteral("Initializing properties..."), this));
             return;
@@ -554,7 +554,7 @@ namespace NexusEditor
     {
         m_addComponentComboBox->clear();
 
-        if (!m_editorWindow || !m_editorWindow->IsEngineInitialized() || m_selectedEntityId == 0)
+        if (!m_editorWindow || m_selectedEntityId == 0)
         {
             return;
         }

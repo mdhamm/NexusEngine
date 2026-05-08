@@ -7,7 +7,6 @@
 #include <NexusEngine.h>
 #include <filesystem/AssetReference.h>
 #include <QDateTime>
-#include <QHash>
 #include <QMainWindow>
 
 namespace NexusEngine
@@ -53,12 +52,6 @@ namespace NexusEditor
         NexusEngine::Scene* GetActiveScene();
 
         /// <summary>
-        /// Returns whether the editor-owned engine has been initialized.
-        /// </summary>
-        /// <returns>True when the engine is ready; otherwise false.</returns>
-        bool IsEngineInitialized() const;
-
-        /// <summary>
         /// Saves the active scene using the editor-owned engine.
         /// </summary>
         /// <param name="filePath">Destination scene path.</param>
@@ -86,9 +79,9 @@ namespace NexusEditor
         QtInputBackend& GetInputBackend();
 
         /// <summary>
-        /// Ensures the editor-owned engine is initialized for the scene view.
+        /// Initializes the editor-owned engine against the scene view native window and a default game instance.
         /// </summary>
-        void EnsureEngineInitialized();
+        void InitializeEngine();
 
         /// <summary>
         /// Resizes the editor-owned render target to match the scene view.
@@ -116,7 +109,6 @@ namespace NexusEditor
         NexusEngine::IO::AssetReference m_sceneFileReference;
         NexusEngine::Engine m_engine;
         QtInputBackend m_inputBackend;
-        bool m_isEngineInitialized = false;
         bool m_isSceneMode = true;
         bool m_hasLoadedScene = false;
 
