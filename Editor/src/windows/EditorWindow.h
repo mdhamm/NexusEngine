@@ -5,6 +5,7 @@
 #endif
 
 #include <NexusEngine.h>
+#include <filesystem/AssetReference.h>
 #include <QDateTime>
 #include <QHash>
 #include <QMainWindow>
@@ -14,7 +15,6 @@ namespace NexusEngine
     struct Material;
 }
 
-#include "AssetFileReference.h"
 #include "EditorProject.h"
 #include "QtInputBackend.h"
 
@@ -113,7 +113,7 @@ namespace NexusEditor
         PropertyWidget* m_propertyWidget = nullptr;
         ContentDrawerWidget* m_contentDrawer = nullptr;
         EditorProject m_project;
-        AssetFileReference m_sceneFileReference;
+        NexusEngine::IO::AssetReference m_sceneFileReference;
         NexusEngine::Engine m_engine;
         QtInputBackend m_inputBackend;
         bool m_isEngineInitialized = false;

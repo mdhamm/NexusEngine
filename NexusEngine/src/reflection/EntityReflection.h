@@ -22,11 +22,6 @@ namespace NexusEngine
 
     using TypeId = std::type_index;
 
-    struct AssetReference
-    {
-        std::string m_guid;
-    };
-
     struct FieldMetadata
     {
         std::string m_name;

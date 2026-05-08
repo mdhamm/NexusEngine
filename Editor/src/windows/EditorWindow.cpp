@@ -8,6 +8,7 @@
 #include "widgets/SceneGraphWidget.h"
 #include "widgets/SceneViewWidget.h"
 
+#include <filesystem/AssetReferenceRegistry.h>
 #include <components/CameraComponent.h>
 #include <components/EditorOnlyComponent.h>
 #include <components/FlyCameraComponent.h>
@@ -40,6 +41,19 @@
 
 namespace NexusEditor
 {
+    namespace
+    {
+        std::string ToStdString(const QString& value)
+        {
+            return value.toStdString();
+        }
+
+        QString ToQString(const std::string& value)
+        {
+            return QString::fromStdString(value);
+        }
+    }
+
     EditorWindow::EditorWindow(const EditorProject& project, QWidget* parent)
         : QMainWindow(parent)
         , m_project(project)
@@ -50,7 +64,7 @@ namespace NexusEditor
         setWindowTitle(QStringLiteral("Nexus Editor - %1").arg(m_project.m_name));
         resize(1600, 900);
         setDockNestingEnabled(true);
-        m_sceneFileReference.BindToPath(QDir(m_project.m_rootPath).filePath(QStringLiteral("EditorScene.nscene")));
+        m_sceneFileReference = NexusEngine::IO::AssetReferenceFromPath(ToStdString(QDir(m_project.m_rootPath).filePath(QStringLiteral("EditorScene.nscene"))));
         BuildMenus();
         BuildLayout();
         EnsureEngineInitialized();
@@ -249,7 +263,7 @@ namespace NexusEditor
                     return;
                 }
 
-                m_sceneFileReference.BindToPath(sceneFilePath);
+                m_sceneFileReference = NexusEngine::IO::AssetReferenceFromPath(ToStdString(sceneFilePath));
                 if (m_sceneGraph)
                 {
                     m_sceneGraph->Refresh();
@@ -381,7 +395,7 @@ namespace NexusEditor
         nativeWindow.m_height = std::max(1, m_sceneView->height());
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
 
-        m_isEngineInitialized = m_engine.Initialize(nativeWindow, std::move(game));
+        m_isEngineInitialized = m_engine.Initialize(nativeWindow, std::move(game), "");
     }
 
     void EditorWindow::SetSceneMode(bool isSceneMode)
@@ -491,17 +505,24 @@ namespace NexusEditor
             return;
         }
 
-        const QString currentPath = QDir::cleanPath(m_sceneFileReference.GetPath());
+        std::string currentPathText;
+        if (!NexusEngine::IO::ResolveAssetReferencePath(m_sceneFileReference, ToStdString(m_project.m_rootPath), currentPathText))
+        {
+            return;
+        }
+
+        const QString currentPath = QDir::cleanPath(ToQString(currentPathText));
         if (currentPath.compare(QDir::cleanPath(newPath), Qt::CaseInsensitive) == 0
             && currentPath.compare(QDir::cleanPath(oldPath), Qt::CaseInsensitive) != 0)
         {
-            statusBar()->showMessage(QStringLiteral("Scene path updated to %1").arg(m_sceneFileReference.GetPath()), 3000);
+            statusBar()->showMessage(QStringLiteral("Scene path updated to %1").arg(currentPath), 3000);
         }
     }
 
     bool EditorWindow::ResolveSceneFilePath()
     {
-        return m_sceneFileReference.ResolveWithinProject(m_project.m_rootPath);
+        std::string resolvedPath;
+        return NexusEngine::IO::ResolveAssetReferencePath(m_sceneFileReference, ToStdString(m_project.m_rootPath), resolvedPath);
     }
 
     void EditorWindow::SaveScene()
@@ -512,15 +533,17 @@ namespace NexusEditor
             return;
         }
 
-        if (!ResolveSceneFilePath())
+        std::string resolvedPath;
+        if (!NexusEngine::IO::ResolveAssetReferencePath(m_sceneFileReference, ToStdString(m_project.m_rootPath), resolvedPath))
         {
             statusBar()->showMessage(QStringLiteral("Current scene file could not be found. Use Save Scene As..."), 3000);
             return;
         }
 
-        if (SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
+        const QString scenePath = ToQString(resolvedPath);
+        if (SaveActiveScene(scenePath, ToQString(m_sceneFileReference.GetGuid())))
         {
-            statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(m_sceneFileReference.GetPath()), 3000);
+            statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(scenePath), 3000);
         }
         else
         {
@@ -530,10 +553,11 @@ namespace NexusEditor
 
     void EditorWindow::SaveSceneAs()
     {
+        const std::string currentPath = NexusEngine::IO::GetAssetReferencePath(m_sceneFileReference, ToStdString(m_project.m_rootPath));
         const QString filePath = QFileDialog::getSaveFileName(
             this,
             QStringLiteral("Save Scene"),
-            m_sceneFileReference.IsEmpty() ? QStringLiteral("EditorScene.nscene") : m_sceneFileReference.GetPath(),
+            m_sceneFileReference.IsEmpty() ? QStringLiteral("EditorScene.nscene") : ToQString(currentPath),
             QStringLiteral("Nexus Scene Files (*.nscene);;All Files (*.*)"));
 
         if (filePath.isEmpty())
@@ -541,11 +565,23 @@ namespace NexusEditor
             return;
         }
 
-        m_sceneFileReference.BindToPath(filePath);
-
-        if (SaveActiveScene(m_sceneFileReference.GetPath(), m_sceneFileReference.GetGuid()))
+        NexusEngine::IO::AssetReference reference = NexusEngine::IO::AssetReferenceFromPath(ToStdString(filePath));
+        if (reference.IsEmpty())
         {
-            statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(m_sceneFileReference.GetPath()), 3000);
+            reference = NexusEngine::IO::CreateAssetReference(ToStdString(filePath));
+        }
+
+        if (reference.IsEmpty())
+        {
+            statusBar()->showMessage(QStringLiteral("Failed to create scene asset reference"), 3000);
+            return;
+        }
+
+        m_sceneFileReference = reference;
+
+        if (SaveActiveScene(filePath, ToQString(m_sceneFileReference.GetGuid())))
+        {
+            statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(filePath), 3000);
         }
         else
         {

@@ -1,16 +1,15 @@
 #pragma once
-#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
-#include <SDL.h>
-#include <flecs.h>
-#include <vector>
-#include <memory>
-#if defined(_WIN32)
-#include <Windows.h>
-#endif // _WIN32
 
 #include "Scene.h"
 #include "input/InputState.h"
 #include "rendering/GraphicsRenderer.h"
+
+#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
+#include <SDL.h>
+#include <filesystem>
+#include <flecs.h>
+#include <memory>
+#include <vector>
 
 #define REF(x) (void)(x)
 
@@ -45,6 +44,12 @@ namespace NexusEngine
         virtual void OnShutdown(Engine& engine) { REF(engine); };
     };
 
+    struct ProjectContext
+    {
+        std::filesystem::path m_projectFile;
+        std::filesystem::path m_projectRoot;
+    };
+
     // Main engine entry point that owns rendering and scene lifetime.
     class Engine
     {
@@ -54,8 +59,9 @@ namespace NexusEngine
         /// </summary>
         /// <param name="win">Native window description used for renderer startup.</param>
         /// <param name="game">Game implementation owned by the engine.</param>
+        /// <param name="context">Project context containing paths and configuration.</param>
         /// <returns>True if initialization succeeds; otherwise false.</returns>
-        bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game);
+        bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectFile);
 
         /// <summary>
         /// Releases engine-owned resources and shuts the game down.
@@ -124,6 +130,8 @@ namespace NexusEngine
         /// <param name="height">New output height in pixels.</param>
         void ResizeOutput(int width, int height);
 
+        const ProjectContext& GetProjectContext() const { return m_projectContext; }
+
     private:
         void Tick(float dt);
         //void BeginUiFrame(float dt);
@@ -155,6 +163,8 @@ namespace NexusEngine
         InputState m_inputState;
 
         IInputBackend* m_inputBackend = nullptr;
+
+        ProjectContext m_projectContext;
 
         struct UiState
         {

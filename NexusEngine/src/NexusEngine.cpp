@@ -14,8 +14,14 @@ namespace NexusEngine
     // Initialization / Shutdown
     // --------------------------------------------------------------
 
-    bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game)
+    bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectFile)
     {
+        // Initialize project context
+        m_projectContext.m_projectFile = projectFile;
+        // Read the file to get the root
+        // It should be in json format with a "root" field that contains the root path
+
+
         assert(game);
         if (!game)
         {

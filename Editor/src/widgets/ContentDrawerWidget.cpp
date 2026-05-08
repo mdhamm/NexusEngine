@@ -1,9 +1,9 @@
 #include "ContentDrawerWidget.h"
 
-#include "AssetFileReference.h"
 #include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 
+#include <filesystem/AssetReferenceRegistry.h>
 #include <QDir>
 #include <QDirIterator>
 #include <QDropEvent>
@@ -180,16 +180,6 @@ namespace NexusEditor
         : QWidget(parent)
         , m_contentRootPath(QDir::cleanPath(contentRootPath))
     {
-        QDirIterator registrationIterator(
-            m_contentRootPath,
-            QStringList{ QStringLiteral("*.nscene") },
-            QDir::Files,
-            QDirIterator::Subdirectories);
-        while (registrationIterator.hasNext())
-        {
-            (void)AssetFileReference::FromPath(registrationIterator.next());
-        }
-
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
@@ -233,7 +223,7 @@ namespace NexusEditor
         };
         folderTreeView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
-            AssetFileReference::NotifyPathChanged(oldPath, newPath);
+            (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
             if (m_onAssetRenamed)
             {
                 m_onAssetRenamed(oldPath, newPath);
@@ -278,7 +268,7 @@ namespace NexusEditor
         };
         contentListView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
-            AssetFileReference::NotifyPathChanged(oldPath, newPath);
+            (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
             if (m_onAssetRenamed)
             {
                 m_onAssetRenamed(oldPath, newPath);
@@ -356,7 +346,7 @@ namespace NexusEditor
             {
                 const QString oldPath = QDir(path).filePath(oldName);
                 const QString newPath = QDir(path).filePath(newName);
-                AssetFileReference::NotifyPathChanged(oldPath, newPath);
+                (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
 
                 if (m_onAssetRenamed)
                 {
@@ -497,7 +487,7 @@ namespace NexusEditor
         const QString filePath = GetNextSceneFilePath(directoryPath);
         if (CreateEmptySceneFile(filePath, QFileInfo(filePath).completeBaseName()))
         {
-            (void)AssetFileReference::FromPath(filePath);
+            (void)NexusEngine::IO::CreateAssetReference(filePath.toStdString());
             SetCurrentFolder(directoryPath);
         }
     }
@@ -507,6 +497,7 @@ namespace NexusEditor
         const QString filePath = GetNextMaterialFilePath(directoryPath);
         if (CreateEmptyMaterialFile(filePath, QFileInfo(filePath).completeBaseName()))
         {
+            (void)NexusEngine::IO::CreateAssetReference(filePath.toStdString());
             SetCurrentFolder(directoryPath);
             if (m_onAssetSelected)
             {

@@ -41,8 +41,6 @@ else()
 
   set(GAME_MAIN
     src/main_win32.cpp
-    src/AssetFileReference.cpp
-    src/AssetFileReference.h
     src/widgets/ContentDrawerWidget.cpp
     src/widgets/ContentDrawerWidget.h
     src/EditorProject.h
