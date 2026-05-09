@@ -45,21 +45,6 @@ namespace NexusEditor
         bool IsInitialized() const;
 
         /// <summary>
-        /// Saves the active editor scene to a file.
-        /// </summary>
-        /// <param name="filePath">Destination file path.</param>
-        /// <param name="assetGuid">Stable guid stored with the scene asset.</param>
-        /// <returns>True if the scene was saved; otherwise false.</returns>
-        bool SaveActiveScene(const QString& filePath, const QString& assetGuid) const;
-
-        /// <summary>
-        /// Loads the active editor scene from a file.
-        /// </summary>
-        /// <param name="filePath">Source scene file path.</param>
-        /// <returns>True if the scene was loaded; otherwise false.</returns>
-        bool LoadScene(const QString& filePath);
-
-        /// <summary>
         /// Sets a callback invoked after the editor scene becomes available.
         /// </summary>
         /// <param name="callback">Callback to run when the scene is ready.</param>

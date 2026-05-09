@@ -9,6 +9,7 @@
 #include "widgets/SceneViewWidget.h"
 
 #include <filesystem/AssetReferenceRegistry.h>
+#include <filesystem/FileIO.h>
 #include <components/CameraComponent.h>
 #include <components/EditorOnlyComponent.h>
 #include <components/FlyCameraComponent.h>
@@ -39,19 +40,6 @@
 
 namespace NexusEditor
 {
-    namespace
-    {
-        std::string ToStdString(const QString& value)
-        {
-            return value.toStdString();
-        }
-
-        QString ToQString(const std::string& value)
-        {
-            return QString::fromStdString(value);
-        }
-    }
-
     EditorWindow::EditorWindow(const EditorProject& project, QWidget* parent)
         : QMainWindow(parent)
         , m_project(project)
@@ -91,15 +79,21 @@ namespace NexusEditor
         return activeScene ? SaveSceneToFile(*activeScene, filePath) : false;
     }
 
-    bool EditorWindow::LoadScene(const QString& filePath)
+    bool EditorWindow::LoadScene(const std::filesystem::path& sceneFilePath)
     {
-        if (filePath.isEmpty())
+        if (sceneFilePath.empty())
         {
             return false;
         }
 
         NexusEngine::Scene* activeScene = m_engine.ActiveScene();
-        if (!activeScene || !LoadSceneFromFile(*activeScene, filePath))
+        assert(activeScene);
+        if (!activeScene)
+        {
+            return false;
+        }
+
+        if (!NexusEngine::IO::LoadFromFile(*activeScene, sceneFilePath, NexusEngine::IO::FileFormat::Json))
         {
             return false;
         }
@@ -150,24 +144,30 @@ namespace NexusEditor
 
     void EditorWindow::BuildLayout()
     {
+        // TODO: A more scalable implementation is needed to handle more widgets.
+
+        // Viewport Tabs. e.g. Scene/Game view modes
         auto* viewportTabs = new QTabWidget(this);
         viewportTabs->setDocumentMode(true);
         viewportTabs->setMovable(true);
         setCentralWidget(viewportTabs);
 
+        // Scene View
         auto* sceneModePage = new QWidget(viewportTabs);
         auto* sceneModeLayout = new QVBoxLayout(sceneModePage);
         sceneModeLayout->setContentsMargins(0, 0, 0, 0);
         viewportTabs->addTab(sceneModePage, QStringLiteral("Scene"));
 
+        // Game View (for testing gameplay mode)
         auto* gameModePage = new QWidget(viewportTabs);
         auto* gameModeLayout = new QVBoxLayout(gameModePage);
         gameModeLayout->setContentsMargins(0, 0, 0, 0);
         viewportTabs->addTab(gameModePage, QStringLiteral("Game"));
 
+        // Start in scene view mode by default
+        // TODO: Revisit this at a later time. It would be nice to be able to look at both Scene and Game views at the same time.
         m_sceneView = new SceneViewWidget(*this, sceneModePage);
         sceneModeLayout->addWidget(m_sceneView);
-
         connect(viewportTabs, &QTabWidget::currentChanged, this,
             [this, viewportTabs, sceneModePage, sceneModeLayout, gameModePage, gameModeLayout](int index)
             {
@@ -193,15 +193,18 @@ namespace NexusEditor
                     m_sceneView->show();
                 }
 
+                // TODO: This is incorrect. game view should be running the editor scene's active camera, but with gameplay systems enabled. This will require a more robust way to manage editor vs gameplay modes in the scene.
                 SetSceneMode(targetPage == sceneModePage);
             });
 
+        // Scene Graph
         auto* sceneGraphDock = new QDockWidget(QStringLiteral("Scene Graph"), this);
         sceneGraphDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
         m_sceneGraph = new SceneGraphWidget(*this, sceneGraphDock);
         sceneGraphDock->setWidget(m_sceneGraph);
         addDockWidget(Qt::LeftDockWidgetArea, sceneGraphDock);
 
+        // Property Editor
         auto* propertyDock = new QDockWidget(QStringLiteral("Properties"), this);
         propertyDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
         m_propertyWidget = new PropertyWidget(*this, propertyDock);
@@ -222,6 +225,7 @@ namespace NexusEditor
                 }
             });
 
+        // Change contents of property editor when element is selected in scene graph
         m_sceneGraph->SetSelectionChangedCallback(
             [this](std::uint64_t entityId)
             {
@@ -231,19 +235,31 @@ namespace NexusEditor
                 }
             });
 
+        // Content Drawer
         auto* contentDrawerDock = new QDockWidget(QStringLiteral("Content Drawer"), this);
         contentDrawerDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
         m_contentDrawer = new ContentDrawerWidget(m_project.m_rootPath, contentDrawerDock);
         m_contentDrawer->SetSceneOpenedCallback(
             [this](const QString& sceneFilePath)
             {
-                if (!LoadScene(sceneFilePath))
+                const std::string strSceneFilePath = sceneFilePath.toStdString();
+
+                if (!LoadScene(strSceneFilePath))
                 {
                     statusBar()->showMessage(QStringLiteral("Failed to load scene %1").arg(sceneFilePath), 3000);
                     return;
                 }
 
-                m_sceneFileReference = NexusEngine::IO::AssetReferenceFromPath(ToStdString(sceneFilePath));
+                NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
+                assert(assetReferenceRegistry);
+                if (!assetReferenceRegistry)
+                {
+                    return;
+                }
+                NexusEngine::IO::AssetReference assetReference = assetReferenceRegistry->GetOrCreateAssetReferenceByPath(absoluteSceneFilePath);
+                assert(!assetReference.IsEmpty());
+                
+                m_sceneFileReference = assetReference;
                 if (m_sceneGraph)
                 {
                     m_sceneGraph->Refresh();
@@ -268,7 +284,20 @@ namespace NexusEditor
         m_contentDrawer->SetAssetRenamedCallback(
             [this](const QString& oldPath, const QString& newPath)
             {
-                UpdateLoadedSceneFilePath(oldPath, newPath);
+                NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
+                assert(assetReferenceRegistry);
+                if (!assetReferenceRegistry)
+                {
+                    return;
+                }
+
+                NexusEngine::IO::AssetReference assetReference = assetReferenceRegistry->GetOrCreateAssetReferenceByPath(oldPath.toStdString());
+                if (assetReference.IsEmpty())
+                {
+                    return;
+                }
+
+                assetReferenceRegistry->UpdateAssetReferencePath(assetReference, newPath.toStdString());
             });
         contentDrawerDock->setWidget(m_contentDrawer);
         addDockWidget(Qt::BottomDockWidgetArea, contentDrawerDock);
@@ -470,27 +499,6 @@ namespace NexusEditor
             {
                 editorCamera.remove<NexusEngine::CameraComponent>();
             }
-        }
-    }
-
-    void EditorWindow::UpdateLoadedSceneFilePath(const QString& oldPath, const QString& newPath)
-    {
-        if (m_sceneFileReference.IsEmpty())
-        {
-            return;
-        }
-
-        std::string currentPathText;
-        if (!NexusEngine::IO::ResolveAssetReferencePath(m_sceneFileReference, ToStdString(m_project.m_rootPath), currentPathText))
-        {
-            return;
-        }
-
-        const QString currentPath = QDir::cleanPath(ToQString(currentPathText));
-        if (currentPath.compare(QDir::cleanPath(newPath), Qt::CaseInsensitive) == 0
-            && currentPath.compare(QDir::cleanPath(oldPath), Qt::CaseInsensitive) != 0)
-        {
-            statusBar()->showMessage(QStringLiteral("Scene path updated to %1").arg(currentPath), 3000);
         }
     }
 

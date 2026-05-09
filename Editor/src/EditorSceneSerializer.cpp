@@ -48,11 +48,6 @@ namespace NexusEditor
         return NexusEngine::IO::SaveToFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
     }
 
-    bool LoadSceneFromFile(NexusEngine::Scene& scene, const QString& filePath)
-    {
-        return NexusEngine::IO::LoadFromFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
-    }
-
     bool CreateEmptySceneFile(const QString& filePath, const QString& sceneName)
     {
         return CreateEmptySceneFile(filePath, sceneName, {});

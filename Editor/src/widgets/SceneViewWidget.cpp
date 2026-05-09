@@ -35,37 +35,6 @@ namespace NexusEditor
         frameTimer->start();
     }
 
-    NexusEngine::Engine* SceneViewWidget::GetEngine()
-    {
-        return m_editorWindow ? m_editorWindow->GetEngine() : nullptr;
-    }
-
-    NexusEngine::Scene* SceneViewWidget::GetActiveScene()
-    {
-        return m_editorWindow ? m_editorWindow->GetActiveScene() : nullptr;
-    }
-
-    bool SceneViewWidget::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
-    {
-        return m_editorWindow && m_editorWindow->SaveActiveScene(filePath, assetGuid);
-    }
-
-    bool SceneViewWidget::LoadScene(const QString& filePath)
-    {
-        if (!m_editorWindow || !m_editorWindow->LoadScene(filePath))
-        {
-            return false;
-        }
-
-        m_hasEmittedSceneReady = true;
-        if (m_onSceneReady)
-        {
-            m_onSceneReady();
-        }
-
-        return true;
-    }
-
     void SceneViewWidget::SetSceneReadyCallback(std::function<void()> callback)
     {
         m_onSceneReady = std::move(callback);

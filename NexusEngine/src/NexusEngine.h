@@ -2,6 +2,7 @@
 
 #include "Scene.h"
 #include "input/InputState.h"
+#include "filesystem/AssetReferenceRegistry.h"
 #include "rendering/GraphicsRenderer.h"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
@@ -42,13 +43,6 @@ namespace NexusEngine
         /// </summary>
         /// <param name="engine">Engine instance being shut down.</param>
         virtual void OnShutdown(Engine& engine) { REF(engine); };
-    };
-
-    struct ProjectContext
-    {
-        std::filesystem::path m_projectRoot;
-
-        std::filesystem::path GetAssetReferenceDirectory() const { return m_projectRoot / ".nexus" / "assetrefs"; }
     };
 
     // Main engine entry point that owns rendering and scene lifetime.
@@ -131,12 +125,12 @@ namespace NexusEngine
         /// <param name="height">New output height in pixels.</param>
         void ResizeOutput(int width, int height);
 
-        const ProjectContext& GetProjectContext() const { return m_projectContext; }
+        const std::filesystem::path& GetProjectRoot() const { return m_projectRoot; }
+
+        IO::AssetReferenceRegistry* GetAssetReferenceRegistry() { return m_assetReferenceRegistry; }
 
     private:
         void Tick(float dt);
-        //void BeginUiFrame(float dt);
-        //void RenderUi(Diligent::IDeviceContext* ctx);
 
     private:
         // Tracks whether initialization completed successfully.
@@ -165,7 +159,9 @@ namespace NexusEngine
 
         IInputBackend* m_inputBackend = nullptr;
 
-        ProjectContext m_projectContext;
+        std::filesystem::path m_projectRoot;
+
+        IO::AssetReferenceRegistry* m_assetReferenceRegistry;
 
         struct UiState
         {

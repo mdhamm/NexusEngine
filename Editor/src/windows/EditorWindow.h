@@ -62,9 +62,9 @@ namespace NexusEditor
         /// <summary>
         /// Loads a scene into the editor-owned engine.
         /// </summary>
-        /// <param name="filePath">Scene asset path to load.</param>
+        /// <param name="sceneFilePath">Scene file path to load.</param>
         /// <returns>True if the scene was loaded; otherwise false.</returns>
-        bool LoadScene(const QString& filePath);
+        bool LoadScene(const std::filesystem::path& sceneFilePath);
 
         /// <summary>
         /// Advances the editor-owned engine by one frame.
@@ -96,7 +96,6 @@ namespace NexusEditor
         void ResolveMaterialAssets();
         void SetSceneMode(bool isSceneMode);
         void ConfigureEditorCamera();
-        void UpdateLoadedSceneFilePath(const QString& oldPath, const QString& newPath);
         bool ResolveSceneFilePath();
         void SaveScene();
         void SaveSceneAs();

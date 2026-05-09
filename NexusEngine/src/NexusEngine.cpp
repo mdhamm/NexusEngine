@@ -14,8 +14,7 @@ namespace NexusEngine
 {
     bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectRoot)
     {
-        // Initialize project context
-        m_projectContext.m_projectRoot = projectRoot;
+        m_projectRoot = projectRoot;
 
         // Store game instance
         assert(game);
@@ -23,12 +22,19 @@ namespace NexusEngine
         {
             return false;
         }
+
+        bool success = true;
         m_game = game.release();
+        
+        // Initialize asset reference registry
+        m_assetReferenceRegistry = new IO::AssetReferenceRegistry(m_projectRoot);
 
         // Initialize graphics renderer
-        bool graphicsInitialized = m_graphicsRenderer.CreateDeviceAndSwapchain(win);
-        m_initialized = graphicsInitialized;
-        return graphicsInitialized;
+        success &= m_graphicsRenderer.CreateDeviceAndSwapchain(win);
+        
+        assert(success);
+        m_initialized = success;
+        return success;
     }
 
     void Engine::Start()
@@ -80,6 +86,12 @@ namespace NexusEngine
         }
 
         m_scenes.clear();
+
+        if (m_assetReferenceRegistry)
+        {
+            delete m_assetReferenceRegistry;
+            m_assetReferenceRegistry = nullptr;
+        }
 
         if (m_started && m_game)
         {
