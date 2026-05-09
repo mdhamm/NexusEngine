@@ -56,6 +56,8 @@ else()
     "src/windows/EditorWindow.h"
     src/widgets/PropertyWidget.cpp
     src/widgets/PropertyWidget.h
+    src/widgets/PropertyWidgetSerializer.cpp
+    src/widgets/PropertyWidgetSerializer.h
     "src/windows/ProjectBrowserWindow.cpp"
     "src/windows/ProjectBrowserWindow.h"
     src/widgets/SceneGraphWidget.cpp

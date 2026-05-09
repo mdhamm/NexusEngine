@@ -284,6 +284,11 @@ namespace NexusEditor
             {
                 if (m_propertyWidget)
                 {
+                    if (m_propertyWidget->TryAssignPickedAssetPath(assetPath))
+                    {
+                        return;
+                    }
+
                     m_propertyWidget->SetSelectedAssetPath(assetPath);
                 }
             });

@@ -90,6 +90,12 @@ namespace NexusEditor
         /// <param name="height">New viewport height in pixels.</param>
         void ResizeSceneViewport(int width, int height);
 
+        /// <summary>
+        /// Returns the absolute project root path used by the editor.
+        /// </summary>
+        /// <returns>The absolute project root path.</returns>
+        const QString& GetProjectRootPath() const { return m_project.m_rootPath; }
+
     private:
         void BuildMenus();
         void BuildLayout();
