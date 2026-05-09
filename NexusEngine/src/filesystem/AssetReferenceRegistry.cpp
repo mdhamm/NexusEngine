@@ -34,6 +34,16 @@ namespace NexusEngine::IO
         {
             return projectRoot / ".nexus" / "assetrefs";
         }
+
+        std::filesystem::path GetAssetMetaFilePath(const std::filesystem::path& path)
+        {
+            if (path.extension() == ".nmeta")
+            {
+                return path;
+            }
+
+            return path.parent_path() / (path.stem().string() + ".nmeta");
+        }
     }
 
     AssetReference AssetReferenceRegistry::CreateAssetReference(const std::filesystem::path& path)
@@ -93,7 +103,7 @@ namespace NexusEngine::IO
         AssetReference assetReference;
         LoadFromFile(
             assetReference,
-            path.parent_path() / (path.stem().string() + ".nmeta"),
+            GetAssetMetaFilePath(path),
             FileFormat::Json);
         return assetReference;
     }
@@ -122,5 +132,38 @@ namespace NexusEngine::IO
             assetReferenceRecord,
             assetReferenceDirectory / (reference.m_guid + ".assetref"),
             FileFormat::Json);
+    }
+
+    void AssetReferenceRegistry::RemoveAssetReferencesForPath(const std::filesystem::path& path)
+    {
+        std::error_code errorCode;
+        if (std::filesystem::is_directory(path, errorCode))
+        {
+            for (std::filesystem::recursive_directory_iterator iterator(path, errorCode), end;
+                 !errorCode && iterator != end;
+                 iterator.increment(errorCode))
+            {
+                if (!iterator->is_regular_file(errorCode) || iterator->path().extension() != ".nmeta")
+                {
+                    continue;
+                }
+
+                RemoveAssetReferencesForPath(iterator->path());
+            }
+
+            return;
+        }
+
+        const std::filesystem::path metaPath = GetAssetMetaFilePath(path);
+        AssetReference assetReference;
+        if (!LoadFromFile(assetReference, metaPath, FileFormat::Json) || assetReference.IsEmpty())
+        {
+            return;
+        }
+
+        const std::filesystem::path assetReferenceDirectory = GetAssetReferenceDirectoryPath(m_projectRoot);
+        std::filesystem::remove(assetReferenceDirectory / (assetReference.GetGuid() + ".assetref"), errorCode);
+        errorCode.clear();
+        std::filesystem::remove(metaPath, errorCode);
     }
 } // namespace NexusEngine::IO

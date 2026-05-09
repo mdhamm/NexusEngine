@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QStringList>
 #include <QWidget>
 
 #include <functional>
@@ -42,6 +43,12 @@ namespace NexusEditor
         /// <param name="callback">Callback receiving the old and new absolute asset paths.</param>
         void SetAssetRenamedCallback(std::function<void(const QString&, const QString&)> callback);
 
+        /// <summary>
+        /// Sets the callback invoked before an asset path or folder is deleted from the content drawer.
+        /// </summary>
+        /// <param name="callback">Callback receiving the absolute asset path or folder path being deleted.</param>
+        void SetAssetDeletedCallback(std::function<void(const QString&)> callback);
+
     private:
         void SetCurrentFolder(const QString& folderPath);
         void RebuildBreadcrumbs(const QString& folderPath);
@@ -53,6 +60,9 @@ namespace NexusEditor
         QString GetNextMaterialFilePath(const QString& directoryPath) const;
         void RenameIndex(const QModelIndex& index);
         void DeleteIndex(const QModelIndex& index);
+        void DeleteSelectedFolderIndexes();
+        void DeleteSelectedContentIndexes();
+        void DeletePaths(QFileSystemModel* model, const QStringList& paths);
         bool IsSceneIndex(const QModelIndex& index) const;
 
         QString m_contentRootPath;
@@ -67,5 +77,6 @@ namespace NexusEditor
         std::function<void(const QString&)> m_onSceneOpened;
         std::function<void(const QString&)> m_onAssetSelected;
         std::function<void(const QString&, const QString&)> m_onAssetRenamed;
+        std::function<void(const QString&)> m_onAssetDeleted;
     };
 } // namespace NexusEditor

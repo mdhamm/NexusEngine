@@ -35,6 +35,21 @@ namespace NexusEditor
         frameTimer->start();
     }
 
+    NexusEngine::Engine* SceneViewWidget::GetEngine()
+    {
+        return m_editorWindow ? m_editorWindow->GetEngine() : nullptr;
+    }
+
+    NexusEngine::Scene* SceneViewWidget::GetActiveScene()
+    {
+        return m_editorWindow ? m_editorWindow->GetActiveScene() : nullptr;
+    }
+
+    bool SceneViewWidget::IsInitialized() const
+    {
+        return m_editorWindow != nullptr && m_editorWindow->GetEngine() != nullptr;
+    }
+
     void SceneViewWidget::SetSceneReadyCallback(std::function<void()> callback)
     {
         m_onSceneReady = std::move(callback);

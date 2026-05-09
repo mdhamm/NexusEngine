@@ -8,7 +8,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <cctype>
 #include <filesystem>
@@ -48,6 +52,11 @@ namespace NexusEditor
         return NexusEngine::IO::SaveToFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
     }
 
+    bool LoadSceneFromFile(NexusEngine::Scene& scene, const QString& filePath)
+    {
+        return NexusEngine::IO::LoadFromFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
+    }
+
     bool CreateEmptySceneFile(const QString& filePath, const QString& sceneName)
     {
         return CreateEmptySceneFile(filePath, sceneName, {});
@@ -73,16 +82,68 @@ namespace NexusEditor
 
     QString ReadSceneFileGuid(const QString& filePath)
     {
-        return QString::fromStdString(NexusEngine::IO::ReadAssetReferenceGuidForPath(filePath.toStdString()));
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            return {};
+        }
+
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+        if (!document.isObject())
+        {
+            return {};
+        }
+
+        return document.object().value(QStringLiteral("guid")).toString().trimmed();
     }
 
     QString EnsureSceneFileGuid(const QString& filePath)
     {
-        return QString::fromStdString(NexusEngine::IO::EnsureAssetReferenceGuid(filePath.toStdString()));
+        const QString existingGuid = ReadSceneFileGuid(filePath);
+        if (!existingGuid.isEmpty())
+        {
+            return existingGuid;
+        }
+
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            return {};
+        }
+
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+        if (!document.isObject())
+        {
+            return {};
+        }
+
+        QJsonObject sceneObject = document.object();
+        const QString guid = QString::fromStdString(NexusEngine::IO::CreateAssetGuid());
+        sceneObject.insert(QStringLiteral("guid"), guid);
+
+        const QFileInfo fileInfo(filePath);
+        if (!QDir().mkpath(fileInfo.absolutePath()))
+        {
+            return {};
+        }
+
+        QFile outputFile(filePath);
+        if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        {
+            return {};
+        }
+
+        outputFile.write(QJsonDocument(sceneObject).toJson(QJsonDocument::Indented));
+        if (outputFile.error() != QFileDevice::NoError)
+        {
+            return {};
+        }
+
+        return guid;
     }
 
     bool IsSceneFilePath(const QString& filePath)
     {
-        return NexusEngine::IO::IsSceneFilePath(filePath.toStdString());
+        return filePath.endsWith(QStringLiteral(".nscene"), Qt::CaseInsensitive);
     }
 } // namespace NexusEditor

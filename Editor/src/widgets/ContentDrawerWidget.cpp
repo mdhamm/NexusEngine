@@ -9,10 +9,12 @@
 #include <QFileSystemModel>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
 #include <QMenu>
 #include <QPushButton>
+#include <QStringList>
 #include <QSplitter>
 #include <QTreeView>
 
@@ -57,8 +59,21 @@ namespace NexusEditor
 
             std::function<QString(const QModelIndex&)> m_getPath;
             std::function<void(const QString&, const QString&)> m_onAssetMoved;
+            std::function<void()> m_onDeleteSelectionRequested;
 
         protected:
+            void keyPressEvent(QKeyEvent* event) override
+            {
+                if (event->key() == Qt::Key_Delete && m_onDeleteSelectionRequested)
+                {
+                    m_onDeleteSelectionRequested();
+                    event->accept();
+                    return;
+                }
+
+                QTreeView::keyPressEvent(event);
+            }
+
             void startDrag(Qt::DropActions supportedActions) override
             {
                 PendingAssetDrag& pendingDrag = GetPendingAssetDrag();
@@ -116,8 +131,21 @@ namespace NexusEditor
             std::function<QString(const QModelIndex&)> m_getPath;
             std::function<bool(const QModelIndex&)> m_isDirectory;
             std::function<void(const QString&, const QString&)> m_onAssetMoved;
+            std::function<void()> m_onDeleteSelectionRequested;
 
         protected:
+            void keyPressEvent(QKeyEvent* event) override
+            {
+                if (event->key() == Qt::Key_Delete && m_onDeleteSelectionRequested)
+                {
+                    m_onDeleteSelectionRequested();
+                    event->accept();
+                    return;
+                }
+
+                QListView::keyPressEvent(event);
+            }
+
             void startDrag(Qt::DropActions supportedActions) override
             {
                 PendingAssetDrag& pendingDrag = GetPendingAssetDrag();
@@ -204,6 +232,7 @@ namespace NexusEditor
         m_folderTreeView->expand(projectIndex);
         m_folderTreeView->setHeaderHidden(true);
         m_folderTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+        m_folderTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
         m_folderTreeView->setDragEnabled(true);
         m_folderTreeView->setAcceptDrops(true);
         m_folderTreeView->setDropIndicatorShown(true);
@@ -219,12 +248,12 @@ namespace NexusEditor
         };
         folderTreeView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
-            (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
             if (m_onAssetRenamed)
             {
                 m_onAssetRenamed(oldPath, newPath);
             }
         };
+        folderTreeView->m_onDeleteSelectionRequested = [this]() { DeleteSelectedFolderIndexes(); };
 
         auto* contentPane = new QWidget(splitter);
         auto* contentPaneLayout = new QVBoxLayout(contentPane);
@@ -248,6 +277,8 @@ namespace NexusEditor
         m_contentListView->setResizeMode(QListView::Adjust);
         m_contentListView->setContextMenuPolicy(Qt::CustomContextMenu);
         m_contentListView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        m_contentListView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+        m_contentListView->setSelectionRectVisible(true);
         m_contentListView->setDragEnabled(true);
         m_contentListView->setAcceptDrops(true);
         m_contentListView->setDropIndicatorShown(true);
@@ -264,12 +295,12 @@ namespace NexusEditor
         };
         contentListView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
-            (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
             if (m_onAssetRenamed)
             {
                 m_onAssetRenamed(oldPath, newPath);
             }
         };
+        contentListView->m_onDeleteSelectionRequested = [this]() { DeleteSelectedContentIndexes(); };
 
         splitter->setStretchFactor(0, 0);
         splitter->setStretchFactor(1, 1);
@@ -342,7 +373,6 @@ namespace NexusEditor
             {
                 const QString oldPath = QDir(path).filePath(oldName);
                 const QString newPath = QDir(path).filePath(newName);
-                (void)NexusEngine::IO::NotifyAssetPathChanged(oldPath.toStdString(), newPath.toStdString());
 
                 if (m_onAssetRenamed)
                 {
@@ -366,6 +396,11 @@ namespace NexusEditor
     void ContentDrawerWidget::SetAssetRenamedCallback(std::function<void(const QString&, const QString&)> callback)
     {
         m_onAssetRenamed = std::move(callback);
+    }
+
+    void ContentDrawerWidget::SetAssetDeletedCallback(std::function<void(const QString&)> callback)
+    {
+        m_onAssetDeleted = std::move(callback);
     }
 
     void ContentDrawerWidget::SetCurrentFolder(const QString& folderPath)
@@ -483,7 +518,6 @@ namespace NexusEditor
         const QString filePath = GetNextSceneFilePath(directoryPath);
         if (CreateEmptySceneFile(filePath, QFileInfo(filePath).completeBaseName()))
         {
-            (void)NexusEngine::IO::CreateAssetReference(filePath.toStdString());
             SetCurrentFolder(directoryPath);
         }
     }
@@ -493,7 +527,6 @@ namespace NexusEditor
         const QString filePath = GetNextMaterialFilePath(directoryPath);
         if (CreateEmptyMaterialFile(filePath, QFileInfo(filePath).completeBaseName()))
         {
-            (void)NexusEngine::IO::CreateAssetReference(filePath.toStdString());
             SetCurrentFolder(directoryPath);
             if (m_onAssetSelected)
             {
@@ -565,6 +598,13 @@ namespace NexusEditor
             return;
         }
 
+        const QFileSystemModel* model = qobject_cast<const QFileSystemModel*>(index.model());
+        const QString path = model ? QDir::cleanPath(model->filePath(index)) : QString{};
+        if (!path.isEmpty() && m_onAssetDeleted)
+        {
+            m_onAssetDeleted(path);
+        }
+
         if (index.model() == m_folderModel)
         {
             m_folderModel->remove(index);
@@ -572,6 +612,98 @@ namespace NexusEditor
         }
 
         m_contentModel->remove(index);
+    }
+
+    void ContentDrawerWidget::DeleteSelectedFolderIndexes()
+    {
+        if (!m_folderTreeView || !m_folderTreeView->selectionModel())
+        {
+            return;
+        }
+
+        QStringList paths;
+        const QModelIndexList selectedIndexes = m_folderTreeView->selectionModel()->selectedRows();
+        for (const QModelIndex& index : selectedIndexes)
+        {
+            if (!index.isValid())
+            {
+                continue;
+            }
+
+            const QString path = QDir::cleanPath(m_folderModel->filePath(index));
+            if (!path.isEmpty() && !paths.contains(path))
+            {
+                paths.push_back(path);
+            }
+        }
+
+        DeletePaths(m_folderModel, paths);
+    }
+
+    void ContentDrawerWidget::DeleteSelectedContentIndexes()
+    {
+        if (!m_contentListView || !m_contentListView->selectionModel())
+        {
+            return;
+        }
+
+        QStringList paths;
+        const QModelIndexList selectedIndexes = m_contentListView->selectionModel()->selectedIndexes();
+        for (const QModelIndex& index : selectedIndexes)
+        {
+            if (!index.isValid())
+            {
+                continue;
+            }
+
+            const QString path = QDir::cleanPath(m_contentModel->filePath(index));
+            if (!path.isEmpty() && !paths.contains(path))
+            {
+                paths.push_back(path);
+            }
+        }
+
+        DeletePaths(m_contentModel, paths);
+
+        if (m_onAssetSelected)
+        {
+            m_onAssetSelected(QString{});
+        }
+    }
+
+    void ContentDrawerWidget::DeletePaths(QFileSystemModel* model, const QStringList& paths)
+    {
+        if (!model || paths.isEmpty())
+        {
+            return;
+        }
+
+        QStringList sortedPaths = paths;
+        std::sort(sortedPaths.begin(), sortedPaths.end(), [](const QString& left, const QString& right)
+        {
+            const int leftDepth = left.count(QDir::separator());
+            const int rightDepth = right.count(QDir::separator());
+            if (leftDepth != rightDepth)
+            {
+                return leftDepth > rightDepth;
+            }
+
+            return left.size() > right.size();
+        });
+
+        for (const QString& path : sortedPaths)
+        {
+            if (m_onAssetDeleted)
+            {
+                m_onAssetDeleted(path);
+            }
+
+            const QModelIndex index = model->index(path);
+            if (index.isValid())
+            {
+                model->remove(index);
+            }
+        }
     }
 
     bool ContentDrawerWidget::IsSceneIndex(const QModelIndex& index) const
