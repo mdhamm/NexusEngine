@@ -1,13 +1,13 @@
 #include "EditorWindow.h"
 
 #include "EditorSceneApp.h"
-#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 #include "widgets/ContentDrawerWidget.h"
 #include "widgets/PropertyWidget.h"
 #include "widgets/SceneGraphWidget.h"
 #include "widgets/SceneViewWidget.h"
 
+#include <assets/MaterialAsset.h>
 #include <filesystem/AssetReferenceRegistry.h>
 #include <filesystem/FileIO.h>
 #include <components/CameraComponent.h>
@@ -432,8 +432,8 @@ namespace NexusEditor
                 MaterialAssetCacheEntry cacheEntry = m_materialAssetCache.value(absolutePath);
                 if (!cacheEntry.m_material || cacheEntry.m_lastModified != materialFileInfo.lastModified())
                 {
-                    MaterialAssetData materialData;
-                    if (!LoadMaterialAssetFile(absolutePath, materialData))
+                    NexusEngine::MaterialAsset materialData;
+                    if (!NexusEngine::LoadMaterialAssetFile(std::filesystem::path(absolutePath.toStdWString()), materialData))
                     {
                         return;
                     }
@@ -455,11 +455,11 @@ namespace NexusEditor
 
                     std::shared_ptr<NexusEngine::Material> material(
                         factory->CreateSurfaceMaterialFromFiles(
-                            materialData.m_name.toUtf8().constData(),
-                            materialData.m_vertexShaderPath.toUtf8().constData(),
-                            materialData.m_pixelShaderPath.toUtf8().constData(),
+                            materialData.m_name.c_str(),
+                            materialData.m_vertexShaderPath.c_str(),
+                            materialData.m_pixelShaderPath.c_str(),
                             materialData.m_isTransparent,
-                            toCullMode(materialData.m_cullMode),
+                            toCullMode(QString::fromStdString(materialData.m_cullMode)),
                             materialData.m_depthTestEnabled,
                             materialData.m_depthWriteEnabled));
 

@@ -1,10 +1,10 @@
 #include "PropertyWidgetSerializer.h"
 
-#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 #include "PropertyWidget.h"
 #include "windows/EditorWindow.h"
 
+#include <assets/MaterialAsset.h>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDragEnterEvent>

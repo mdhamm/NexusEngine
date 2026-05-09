@@ -1,10 +1,10 @@
 #include "PropertyWidget.h"
 
-#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 #include "EditorWindow.h"
 #include "PropertyWidgetSerializer.h"
 
+#include <assets/MaterialAsset.h>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -213,7 +213,7 @@ namespace NexusEditor
 
     void PropertyWidget::Refresh()
     {
-        const bool isMaterialAssetSelected = IsMaterialAssetFilePath(m_selectedAssetPath);
+        const bool isMaterialAssetSelected = NexusEngine::IsMaterialAssetFilePath(m_selectedAssetPath.toStdString());
         m_addComponentComboBox->setVisible(!isMaterialAssetSelected);
         if (m_addComponentButton)
         {
@@ -240,7 +240,7 @@ namespace NexusEditor
             return;
         }
 
-        if (IsMaterialAssetFilePath(m_selectedAssetPath))
+        if (NexusEngine::IsMaterialAssetFilePath(m_selectedAssetPath.toStdString()))
         {
             return;
         }
@@ -448,7 +448,7 @@ namespace NexusEditor
         switch (assetType)
         {
         case NexusEngine::AssetType::Material:
-            return IsMaterialAssetFilePath(normalizedPath);
+            return NexusEngine::IsMaterialAssetFilePath(normalizedPath.toStdString());
         case NexusEngine::AssetType::Scene:
             return IsSceneFilePath(normalizedPath);
         case NexusEngine::AssetType::Mesh:
@@ -528,36 +528,36 @@ namespace NexusEditor
     {
         ClearLayout(m_contentLayout);
 
-        MaterialAssetData materialData;
-        if (!LoadMaterialAssetFile(m_selectedAssetPath, materialData))
+        NexusEngine::MaterialAsset materialData;
+        if (!LoadMaterialAssetFile(std::filesystem::path(m_selectedAssetPath.toStdWString()), materialData))
         {
             m_contentLayout->addWidget(new QLabel(QStringLiteral("Select an entity to inspect"), this));
             return;
         }
 
-        auto* assetNameLabel = new QLabel(materialData.m_name, this);
+        auto* assetNameLabel = new QLabel(QString::fromStdString(materialData.m_name), this);
         m_contentLayout->addWidget(assetNameLabel);
 
         auto* groupBox = new QGroupBox(QStringLiteral("Material"), this);
         auto* formLayout = new QFormLayout(groupBox);
 
-        auto saveMaterial = [this](const MaterialAssetData& updatedMaterialData)
+        auto saveMaterial = [this](const NexusEngine::MaterialAsset& updatedMaterialData)
         {
-            (void)SaveMaterialAssetFile(m_selectedAssetPath, updatedMaterialData);
+            (void)SaveMaterialAssetFile(std::filesystem::path(m_selectedAssetPath.toStdWString()), updatedMaterialData);
         };
 
-        auto* vertexShaderLineEdit = new QLineEdit(materialData.m_vertexShaderPath, groupBox);
+        auto* vertexShaderLineEdit = new QLineEdit(QString::fromStdString(materialData.m_vertexShaderPath), groupBox);
         connect(vertexShaderLineEdit, &QLineEdit::editingFinished, groupBox, [saveMaterial, materialData, vertexShaderLineEdit]() mutable
             {
-                materialData.m_vertexShaderPath = vertexShaderLineEdit->text().trimmed();
+                materialData.m_vertexShaderPath = vertexShaderLineEdit->text().trimmed().toStdString();
                 saveMaterial(materialData);
             });
         formLayout->addRow(QStringLiteral("Vertex Shader (string)"), vertexShaderLineEdit);
 
-        auto* pixelShaderLineEdit = new QLineEdit(materialData.m_pixelShaderPath, groupBox);
+        auto* pixelShaderLineEdit = new QLineEdit(QString::fromStdString(materialData.m_pixelShaderPath), groupBox);
         connect(pixelShaderLineEdit, &QLineEdit::editingFinished, groupBox, [saveMaterial, materialData, pixelShaderLineEdit]() mutable
             {
-                materialData.m_pixelShaderPath = pixelShaderLineEdit->text().trimmed();
+                materialData.m_pixelShaderPath = pixelShaderLineEdit->text().trimmed().toStdString();
                 saveMaterial(materialData);
             });
         formLayout->addRow(QStringLiteral("Pixel Shader (string)"), pixelShaderLineEdit);
@@ -575,10 +575,10 @@ namespace NexusEditor
         cullModeComboBox->addItem(QStringLiteral("None"));
         cullModeComboBox->addItem(QStringLiteral("Front"));
         cullModeComboBox->addItem(QStringLiteral("Back"));
-        cullModeComboBox->setCurrentText(materialData.m_cullMode);
+        cullModeComboBox->setCurrentText(QString::fromStdString(materialData.m_cullMode));
         connect(cullModeComboBox, &QComboBox::currentTextChanged, groupBox, [saveMaterial, materialData](const QString& text) mutable
             {
-                materialData.m_cullMode = text;
+                materialData.m_cullMode = text.toStdString();
                 saveMaterial(materialData);
             });
         formLayout->addRow(QStringLiteral("Cull Mode (string)"), cullModeComboBox);

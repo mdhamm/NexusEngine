@@ -1,8 +1,8 @@
 #include "ContentDrawerWidget.h"
 
-#include "EditorMaterialSerializer.h"
 #include "EditorSceneSerializer.h"
 
+#include <assets/MaterialAsset.h>
 #include <filesystem/AssetReferenceRegistry.h>
 #include <QDir>
 #include <QDropEvent>
@@ -402,7 +402,7 @@ namespace NexusEditor
                 }
 
                 const QString filePath = m_contentModel->filePath(sourceIndex);
-                m_onAssetSelected(IsMaterialAssetFilePath(filePath) ? filePath : QString{});
+                m_onAssetSelected(NexusEngine::IsMaterialAssetFilePath(filePath.toStdString()) ? filePath : QString{});
             });
 
         connect(m_contentListView, &QWidget::customContextMenuRequested, this,
@@ -597,7 +597,7 @@ namespace NexusEditor
     void ContentDrawerWidget::CreateMaterialInDirectory(const QString& directoryPath)
     {
         const QString filePath = GetNextMaterialFilePath(directoryPath);
-        if (CreateEmptyMaterialFile(filePath, QFileInfo(filePath).completeBaseName()))
+        if (NexusEngine::CreateEmptyMaterialAssetFile(std::filesystem::path(filePath.toStdWString()), QFileInfo(filePath).completeBaseName().toStdString()))
         {
             SetCurrentFolder(directoryPath);
             if (m_onAssetSelected)

@@ -46,12 +46,12 @@ else()
     src/EditorProject.h
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
-    src/EditorMaterialSerializer.cpp
-    src/EditorMaterialSerializer.h
     src/EditorSceneApp.cpp
     src/EditorSceneApp.h
     src/EditorSceneSerializer.cpp
     src/EditorSceneSerializer.h
+    src/FileExtensionInfo.cpp
+    src/FileExtensionInfo.h
     "src/windows/EditorWindow.cpp"
     "src/windows/EditorWindow.h"
     src/widgets/PropertyWidget.cpp
@@ -67,7 +67,6 @@ else()
   )
 endif()
 
-add_executable(Editor ${GAME_MAIN})
 target_link_libraries(Editor PRIVATE SampleGame)
 
 target_include_directories(Editor PUBLIC
