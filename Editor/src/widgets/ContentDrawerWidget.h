@@ -54,8 +54,10 @@ namespace NexusEditor
         void RebuildBreadcrumbs(const QString& folderPath);
         void ShowFolderContextMenu(const QPoint& position);
         void ShowContentContextMenu(const QPoint& position);
+        void CreateFolderInDirectory(const QString& directoryPath);
         void CreateSceneInDirectory(const QString& directoryPath);
         void CreateMaterialInDirectory(const QString& directoryPath);
+        QString GetNextFolderPath(const QString& directoryPath) const;
         QString GetNextSceneFilePath(const QString& directoryPath) const;
         QString GetNextMaterialFilePath(const QString& directoryPath) const;
         void RenameIndex(const QModelIndex& index);

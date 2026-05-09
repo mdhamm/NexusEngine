@@ -479,6 +479,7 @@ namespace NexusEditor
 
         QMenu menu(this);
         QMenu* createMenu = menu.addMenu(QStringLiteral("Create"));
+        createMenu->addAction(QStringLiteral("Folder"), this, [this, folderPath]() { CreateFolderInDirectory(folderPath); });
         createMenu->addAction(QStringLiteral("Scene"), this, [this, folderPath]() { CreateSceneInDirectory(folderPath); });
         createMenu->addAction(QStringLiteral("Material"), this, [this, folderPath]() { CreateMaterialInDirectory(folderPath); });
 
@@ -501,6 +502,7 @@ namespace NexusEditor
 
         QMenu menu(this);
         QMenu* createMenu = menu.addMenu(QStringLiteral("New"));
+        createMenu->addAction(QStringLiteral("Folder"), this, [this, targetDirectory]() { CreateFolderInDirectory(targetDirectory); });
         createMenu->addAction(QStringLiteral("Scene"), this, [this, targetDirectory]() { CreateSceneInDirectory(targetDirectory); });
         createMenu->addAction(QStringLiteral("Material"), this, [this, targetDirectory]() { CreateMaterialInDirectory(targetDirectory); });
 
@@ -511,6 +513,29 @@ namespace NexusEditor
         }
 
         menu.exec(m_contentListView->viewport()->mapToGlobal(position));
+    }
+
+    void ContentDrawerWidget::CreateFolderInDirectory(const QString& directoryPath)
+    {
+        const QString folderPath = GetNextFolderPath(directoryPath);
+        const QFileInfo folderInfo(folderPath);
+        const QModelIndex parentIndex = m_folderModel->index(folderInfo.absolutePath());
+        if (!parentIndex.isValid())
+        {
+            return;
+        }
+
+        const QModelIndex createdIndex = m_folderModel->mkdir(parentIndex, folderInfo.fileName());
+        if (!createdIndex.isValid())
+        {
+            return;
+        }
+
+        SetCurrentFolder(directoryPath);
+        m_folderTreeView->expand(parentIndex);
+        m_folderTreeView->setCurrentIndex(createdIndex);
+        m_folderTreeView->scrollTo(createdIndex);
+        m_folderTreeView->edit(createdIndex);
     }
 
     void ContentDrawerWidget::CreateSceneInDirectory(const QString& directoryPath)
@@ -533,6 +558,26 @@ namespace NexusEditor
                 m_onAssetSelected(filePath);
             }
         }
+    }
+
+    QString ContentDrawerWidget::GetNextFolderPath(const QString& directoryPath) const
+    {
+        const QString cleanDirectoryPath = QDir::cleanPath(directoryPath);
+        const QString baseName = QStringLiteral("NewFolder");
+        QString candidateFolderPath = QDir(cleanDirectoryPath).filePath(baseName);
+        if (!QFileInfo::exists(candidateFolderPath))
+        {
+            return candidateFolderPath;
+        }
+
+        int suffix = 1;
+        do
+        {
+            candidateFolderPath = QDir(cleanDirectoryPath).filePath(
+                QStringLiteral("%1_%2").arg(baseName).arg(suffix++));
+        } while (QFileInfo::exists(candidateFolderPath));
+
+        return candidateFolderPath;
     }
 
     QString ContentDrawerWidget::GetNextSceneFilePath(const QString& directoryPath) const
