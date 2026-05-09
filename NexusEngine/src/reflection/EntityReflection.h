@@ -55,6 +55,7 @@ namespace NexusEngine
         std::vector<FieldMetadata> m_fields;
         std::function<bool(const flecs::entity&)> m_hasComponent;
         std::function<void(const flecs::entity&)> m_addComponent;
+        std::function<void(const flecs::entity&)> m_removeComponent;
         std::function<const void*(const flecs::entity&)> m_getComponent;
         std::function<void*(const flecs::entity&)> m_getMutableComponent;
         std::function<void(const flecs::entity&, void*)> m_afterApply;
@@ -152,6 +153,12 @@ namespace NexusEngine
             {
                 flecs::entity mutableEntity = entity;
                 mutableEntity.set(T{});
+            };
+
+            it->second.m_removeComponent = [](const flecs::entity& entity)
+            {
+                flecs::entity mutableEntity = entity;
+                mutableEntity.remove<T>();
             };
 
             it->second.m_getComponent = [](const flecs::entity& entity) -> const void*

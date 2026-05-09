@@ -98,6 +98,28 @@ namespace NexusEditor
             return false;
         }
 
+        std::vector<flecs::entity> entitiesToDestroy;
+        activeScene->m_world.each<NexusEngine::TransformComponent>(
+            [&](flecs::entity entity, NexusEngine::TransformComponent&)
+            {
+                if (!entity.is_valid() || !entity.is_alive())
+                {
+                    return;
+                }
+
+                if (entity.has<NexusEngine::EditorOnlyComponent>())
+                {
+                    return;
+                }
+
+                entitiesToDestroy.push_back(entity);
+            });
+
+        for (const flecs::entity& entity : entitiesToDestroy)
+        {
+            activeScene->DestroyEntity(entity);
+        }
+
         if (!LoadSceneFromFile(*activeScene, QString::fromStdWString(sceneFilePath.wstring())))
         {
             return false;
@@ -237,6 +259,14 @@ namespace NexusEditor
                 if (m_propertyWidget)
                 {
                     m_propertyWidget->SetSelectedEntityId(entityId);
+                }
+            });
+        m_sceneGraph->SetEntityDeletedCallback(
+            [this](std::uint64_t entityId)
+            {
+                if (m_propertyWidget)
+                {
+                    m_propertyWidget->NotifyEntityDeleted(entityId);
                 }
             });
 

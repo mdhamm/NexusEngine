@@ -14,6 +14,18 @@ namespace NexusEngine::IO
             std::filesystem::path m_path;
         };
 
+        std::filesystem::path NormalizeToProjectRelativePath(const std::filesystem::path& path, const std::filesystem::path& projectRoot)
+        {
+            if (path.empty())
+            {
+                return {};
+            }
+
+            return path.is_absolute()
+                ? std::filesystem::relative(path, projectRoot)
+                : path;
+        }
+
         void Serialize(const AssetReferenceRecord& record, NexusEngine::ISerializeWriter& writer)
         {
             writer.Write("guid", record.m_guid);
@@ -49,10 +61,11 @@ namespace NexusEngine::IO
     AssetReference AssetReferenceRegistry::CreateAssetReference(const std::filesystem::path& path)
     {
         bool success = true;
+        const AssetReference assetReference{ CreateAssetGuid() };
 
         // Create a .nmeta file next to the asset to store the asset reference guid. This allows for O(1) lookup of the asset reference by path.
         success &= SaveToFile(
-            AssetReference{ CreateAssetGuid() },
+            assetReference,
             path.parent_path() / (path.stem().string() + ".nmeta"),
             FileFormat::Json);
 
@@ -62,10 +75,9 @@ namespace NexusEngine::IO
         }
 
         // Store the mapping between the asset reference guid and the asset path in the registry directory.
-        const std::filesystem::path relativePath = std::filesystem::relative(path, m_projectRoot);
+        const std::filesystem::path relativePath = NormalizeToProjectRelativePath(path, m_projectRoot);
         const std::filesystem::path assetReferenceDirectory = GetAssetReferenceDirectoryPath(m_projectRoot);
 
-        AssetReference assetReference{ CreateAssetGuid() };
         success &= SaveToFile(
             AssetReferenceRecord{ assetReference.GetGuid(), relativePath },
             assetReferenceDirectory / (assetReference.GetGuid() + ".assetref"),
@@ -111,10 +123,44 @@ namespace NexusEngine::IO
     AssetReference AssetReferenceRegistry::GetOrCreateAssetReferenceByPath(const std::filesystem::path& path)
     {
         AssetReference assetReference = LookupAssetReferenceByPath(path);
-        if (assetReference.m_guid.empty())
+        if (!assetReference.m_guid.empty())
         {
-            assetReference = CreateAssetReference(path);
+            const std::filesystem::path resolvedPath = ResolveAssetReferencePath(assetReference);
+            if (!resolvedPath.empty())
+            {
+                return assetReference;
+            }
         }
+
+        const std::filesystem::path relativePath = NormalizeToProjectRelativePath(path, m_projectRoot);
+        const std::filesystem::path assetReferenceDirectory = GetAssetReferenceDirectoryPath(m_projectRoot);
+        std::error_code errorCode;
+        for (std::filesystem::directory_iterator iterator(assetReferenceDirectory, errorCode), end;
+             !errorCode && iterator != end;
+             iterator.increment(errorCode))
+        {
+            if (!iterator->is_regular_file(errorCode) || iterator->path().extension() != ".assetref")
+            {
+                continue;
+            }
+
+            AssetReferenceRecord record;
+            if (!LoadFromFile(record, iterator->path(), FileFormat::Json))
+            {
+                continue;
+            }
+
+            if (NormalizeToProjectRelativePath(record.m_path, m_projectRoot) != relativePath)
+            {
+                continue;
+            }
+
+            assetReference = AssetReference{ record.m_guid };
+            SaveToFile(assetReference, GetAssetMetaFilePath(path), FileFormat::Json);
+            return assetReference;
+        }
+
+        assetReference = CreateAssetReference(path);
         return assetReference;
     }
 
@@ -127,7 +173,7 @@ namespace NexusEngine::IO
         const std::filesystem::path assetReferenceDirectory = GetAssetReferenceDirectoryPath(m_projectRoot);
         AssetReferenceRecord assetReferenceRecord;
         assetReferenceRecord.m_guid = reference.GetGuid();
-        assetReferenceRecord.m_path = std::filesystem::relative(newPath, m_projectRoot);
+        assetReferenceRecord.m_path = NormalizeToProjectRelativePath(newPath, m_projectRoot);
         SaveToFile(
             assetReferenceRecord,
             assetReferenceDirectory / (reference.m_guid + ".assetref"),

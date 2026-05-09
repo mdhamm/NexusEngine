@@ -62,6 +62,7 @@ namespace NexusEditor
         /// <param name="assetPath">Absolute or project-relative asset path selected in the content drawer.</param>
         /// <returns>True when the selection was consumed by an active asset-reference picker; otherwise false.</returns>
         bool TryAssignPickedAssetPath(const QString& assetPath);
+        void NotifyEntityDeleted(std::uint64_t entityId);
 
         QStringList GetAssetPathsForType(NexusEngine::AssetType assetType) const;
         QString NormalizeAssetPath(const QString& assetPath) const;
@@ -90,6 +91,7 @@ namespace NexusEditor
         void RebuildAssetContents();
         void RebuildContents();
         void RebuildAddComponentOptions();
+        void RemoveComponent(const std::string& componentName);
         bool IsInteracting() const;
 
         EditorWindow* m_editorWindow = nullptr;

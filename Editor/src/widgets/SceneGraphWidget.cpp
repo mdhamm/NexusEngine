@@ -7,7 +7,10 @@
 #include <components/TransformComponent.h>
 
 #include <QHeaderView>
+#include <QMenu>
+#include <QHBoxLayout>
 #include <QPushButton>
+#include <QShortcut>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -39,13 +42,18 @@ namespace NexusEditor
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
+        auto* buttonLayout = new QHBoxLayout();
         auto* addEntityButton = new QPushButton(QStringLiteral("Add Entity"), this);
-        layout->addWidget(addEntityButton);
+        auto* deleteEntityButton = new QPushButton(QStringLiteral("Delete Entity"), this);
+        buttonLayout->addWidget(addEntityButton);
+        buttonLayout->addWidget(deleteEntityButton);
+        layout->addLayout(buttonLayout);
 
         m_treeWidget = new QTreeWidget(this);
         m_treeWidget->setColumnCount(1);
         m_treeWidget->setHeaderLabel(QStringLiteral("Scene"));
         m_treeWidget->header()->setStretchLastSection(true);
+        m_treeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
         layout->addWidget(m_treeWidget);
 
         connect(addEntityButton, &QPushButton::clicked, this, [this]()
@@ -74,6 +82,18 @@ namespace NexusEditor
                 }
             });
 
+        connect(deleteEntityButton, &QPushButton::clicked, this, [this]()
+            {
+                DeleteSelectedEntity();
+            });
+
+        auto* deleteEntityShortcut = new QShortcut(QKeySequence::Delete, m_treeWidget);
+        deleteEntityShortcut->setContext(Qt::WidgetShortcut);
+        connect(deleteEntityShortcut, &QShortcut::activated, this, [this]()
+            {
+                DeleteSelectedEntity();
+            });
+
         connect(m_treeWidget, &QTreeWidget::currentItemChanged, this,
             [this](QTreeWidgetItem* current, QTreeWidgetItem*)
             {
@@ -85,6 +105,22 @@ namespace NexusEditor
                 {
                     m_onSelectionChanged(m_selectedEntityId);
                 }
+            });
+
+        connect(m_treeWidget, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint& position)
+            {
+                QTreeWidgetItem* item = m_treeWidget ? m_treeWidget->itemAt(position) : nullptr;
+                if (!item)
+                {
+                    return;
+                }
+
+                m_treeWidget->setCurrentItem(item);
+
+                QMenu menu(this);
+                menu.addAction(QStringLiteral("Delete Entity"), this, [this]() { DeleteSelectedEntity(); });
+                menu.exec(m_treeWidget->viewport()->mapToGlobal(position));
             });
 
         Refresh();
@@ -188,5 +224,45 @@ namespace NexusEditor
     void SceneGraphWidget::SetSelectionChangedCallback(std::function<void(std::uint64_t)> callback)
     {
         m_onSelectionChanged = std::move(callback);
+    }
+
+    void SceneGraphWidget::SetEntityDeletedCallback(std::function<void(std::uint64_t)> callback)
+    {
+        m_onEntityDeleted = std::move(callback);
+    }
+
+    void SceneGraphWidget::DeleteSelectedEntity()
+    {
+        if (!m_editorWindow || m_selectedEntityId == 0)
+        {
+            return;
+        }
+
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
+        if (!activeScene)
+        {
+            return;
+        }
+
+        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive())
+        {
+            return;
+        }
+
+        const std::uint64_t deletedEntityId = m_selectedEntityId;
+        activeScene->DestroyEntity(entity);
+        m_selectedEntityId = 0;
+        Refresh();
+
+        if (m_onSelectionChanged)
+        {
+            m_onSelectionChanged(0);
+        }
+
+        if (m_onEntityDeleted)
+        {
+            m_onEntityDeleted(deletedEntityId);
+        }
     }
 } // namespace NexusEditor

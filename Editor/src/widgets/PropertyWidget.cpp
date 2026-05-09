@@ -169,6 +169,17 @@ namespace NexusEditor
         return true;
     }
 
+    void PropertyWidget::NotifyEntityDeleted(std::uint64_t entityId)
+    {
+        if (m_selectedEntityId != entityId)
+        {
+            return;
+        }
+
+        m_selectedEntityId = 0;
+        Refresh();
+    }
+
     void PropertyWidget::SetSelectedEntityId(std::uint64_t entityId)
     {
         m_selectedAssetPath.clear();
@@ -405,6 +416,35 @@ namespace NexusEditor
         SyncDisplayedValues();
     }
 
+    void PropertyWidget::RemoveComponent(const std::string& componentName)
+    {
+        if (!m_editorWindow || m_selectedEntityId == 0)
+        {
+            return;
+        }
+
+        NexusEngine::Scene* activeScene = m_editorWindow->GetActiveScene();
+        if (!activeScene)
+        {
+            return;
+        }
+
+        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive())
+        {
+            return;
+        }
+
+        const NexusEngine::ComponentMetadata* metadata = NexusEngine::MetadataRegistry::Instance().FindByName(componentName);
+        if (!metadata || !metadata->m_removeComponent)
+        {
+            return;
+        }
+
+        metadata->m_removeComponent(entity);
+        Refresh();
+    }
+
     bool PropertyWidget::IsAssetReferencePickActive(const QString& controlObjectName) const
     {
         return m_pendingAssetReferencePick.has_value()
@@ -630,6 +670,13 @@ namespace NexusEditor
 
             auto* groupBox = new QGroupBox(QString::fromStdString(metadata.m_name), this);
             auto* formLayout = new QFormLayout(groupBox);
+            auto* removeComponentButton = new QPushButton(QStringLiteral("Remove Component"), groupBox);
+            removeComponentButton->setEnabled(metadata.m_removeComponent != nullptr);
+            connect(removeComponentButton, &QPushButton::clicked, groupBox, [this, componentName = metadata.m_name]()
+                {
+                    RemoveComponent(componentName);
+                });
+            formLayout->addRow(QString{}, removeComponentButton);
 
             NexusEngine::ForEachField(
                 *componentView,
