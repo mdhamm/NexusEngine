@@ -1,5 +1,6 @@
 #pragma once
 
+#include "filesystem/AssetReference.h"
 #include "reflection/EntityReflection.h"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
@@ -21,8 +22,8 @@ namespace NexusEngine
         // Shared material used to render the mesh.
         Material* material = nullptr;
 
-        // Material asset path used to resolve the runtime material instance.
-        std::string m_materialAssetPath;
+        // Material asset reference used to resolve the runtime material instance.
+        IO::AssetReference m_materialAssetReference;
 
         // Optional per-instance shader resource binding.
         Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> instanceSRB;
@@ -50,14 +51,14 @@ namespace NexusEngine
         static void Register(flecs::world& world, MetadataRegistry& registry)
         {
             world.component<RenderMeshComponent>()
-                .member<std::string>("materialAssetPath")
+                .member<IO::AssetReference>("materialAssetReference")
                 .member<bool>("visible")
                 .member<bool>("castShadows")
                 .member<bool>("receiveShadows")
                 .member<int>("renderLayer");
 
             registry.component<RenderMeshComponent>("RenderMeshComponent")
-                .field("Material Asset", &RenderMeshComponent::m_materialAssetPath)
+                .field("Material Asset", &RenderMeshComponent::m_materialAssetReference)
                     .assetType(AssetType::Material)
                 .field("Visible", &RenderMeshComponent::visible)
                 .field("Cast Shadows", &RenderMeshComponent::castShadows)

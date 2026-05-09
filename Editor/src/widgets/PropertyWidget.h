@@ -67,6 +67,12 @@ namespace NexusEditor
         QStringList GetAssetPathsForType(NexusEngine::AssetType assetType) const;
         QString NormalizeAssetPath(const QString& assetPath) const;
         bool IsAcceptedAssetPath(const QString& assetPath, NexusEngine::AssetType assetType) const;
+        QString GetAssetReferenceDisplayPath(const std::string& assetReferenceGuid) const;
+        bool AssignAssetReferencePath(
+            const NexusEngine::ComponentMetadata& metadata,
+            const flecs::entity& entity,
+            const std::string& fieldName,
+            const QString& assetPath) const;
         void BeginAssetReferencePick(
             const std::string& componentName,
             const std::string& fieldName,

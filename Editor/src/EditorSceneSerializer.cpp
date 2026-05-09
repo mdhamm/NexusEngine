@@ -57,6 +57,15 @@ namespace NexusEditor
         return NexusEngine::IO::LoadFromFile(scene, ToFilesystemPath(filePath), NexusEngine::IO::FileFormat::Json);
     }
 
+    std::string SerializeSceneToJsonText(const NexusEngine::Scene& scene)
+    {
+        json sceneJson;
+        NexusEngine::JsonSerializeWriter writer(sceneJson);
+        writer.BeginObject();
+        NexusEngine::Serialize(scene, writer);
+        return sceneJson.dump(4) + '\n';
+    }
+
     bool CreateEmptySceneFile(const QString& filePath, const QString& sceneName)
     {
         return CreateEmptySceneFile(filePath, sceneName, {});

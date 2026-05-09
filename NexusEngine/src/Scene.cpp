@@ -56,7 +56,7 @@ namespace NexusEngine
             scene.m_world.each<RenderMeshComponent>(
                 [&](flecs::entity, RenderMeshComponent& renderMesh)
                 {
-                    if (renderMesh.mesh && (renderMesh.material || !renderMesh.m_materialAssetPath.empty()))
+                    if (renderMesh.mesh && (renderMesh.material || !renderMesh.m_materialAssetReference.IsEmpty()))
                     {
                         return;
                     }
@@ -76,7 +76,7 @@ namespace NexusEngine
                         renderMesh.mesh = cubeMesh;
                     }
 
-                    if (!renderMesh.material && renderMesh.m_materialAssetPath.empty())
+                    if (!renderMesh.material && renderMesh.m_materialAssetReference.IsEmpty())
                     {
                         renderMesh.material = unlitMaterial;
                     }

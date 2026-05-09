@@ -10,6 +10,7 @@ class QHBoxLayout;
 class QListView;
 class QModelIndex;
 class QPushButton;
+class QSortFilterProxyModel;
 class QTreeView;
 class QWidget;
 
@@ -66,10 +67,13 @@ namespace NexusEditor
         void DeleteSelectedContentIndexes();
         void DeletePaths(QFileSystemModel* model, const QStringList& paths);
         bool IsSceneIndex(const QModelIndex& index) const;
+        QModelIndex ToSourceIndex(const QModelIndex& index) const;
 
         QString m_contentRootPath;
         QFileSystemModel* m_folderModel = nullptr;
         QFileSystemModel* m_contentModel = nullptr;
+        QSortFilterProxyModel* m_folderProxyModel = nullptr;
+        QSortFilterProxyModel* m_contentProxyModel = nullptr;
         QTreeView* m_folderTreeView = nullptr;
         QWidget* m_breadcrumbWidget = nullptr;
         QHBoxLayout* m_breadcrumbLayout = nullptr;

@@ -30,6 +30,13 @@ namespace NexusEditor
     bool LoadSceneFromFile(NexusEngine::Scene& scene, const QString& filePath);
 
     /// <summary>
+    /// Serializes a scene to JSON text using reflected component properties.
+    /// </summary>
+    /// <param name="scene">Scene to serialize.</param>
+    /// <returns>The serialized scene JSON text.</returns>
+    std::string SerializeSceneToJsonText(const NexusEngine::Scene& scene);
+
+    /// <summary>
     /// Creates an empty scene asset file on disk.
     /// </summary>
     /// <param name="filePath">Destination scene asset path.</param>

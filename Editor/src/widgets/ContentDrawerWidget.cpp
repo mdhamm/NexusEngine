@@ -14,6 +14,7 @@
 #include <QListView>
 #include <QMenu>
 #include <QPushButton>
+#include <QSortFilterProxyModel>
 #include <QStringList>
 #include <QSplitter>
 #include <QTreeView>
@@ -38,6 +39,37 @@ namespace NexusEditor
                 }
 
                 return QFileSystemModel::data(index, role);
+            }
+        };
+
+        class AssetFilterProxyModel final : public QSortFilterProxyModel
+        {
+        public:
+            using QSortFilterProxyModel::QSortFilterProxyModel;
+
+        protected:
+            bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override
+            {
+                const auto* fileSystemModel = qobject_cast<const QFileSystemModel*>(sourceModel());
+                if (!fileSystemModel)
+                {
+                    return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
+                }
+
+                const QModelIndex sourceIndex = fileSystemModel->index(sourceRow, 0, sourceParent);
+                if (!sourceIndex.isValid())
+                {
+                    return false;
+                }
+
+                const QString fileName = fileSystemModel->fileName(sourceIndex);
+                if (fileName.compare(QStringLiteral(".nexus"), Qt::CaseInsensitive) == 0 ||
+                    fileName.endsWith(QStringLiteral(".nmeta"), Qt::CaseInsensitive))
+                {
+                    return false;
+                }
+
+                return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
             }
         };
 
@@ -222,14 +254,19 @@ namespace NexusEditor
         m_contentModel->setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
         m_contentModel->setRootPath(m_contentRootPath);
 
+        m_folderProxyModel = new AssetFilterProxyModel(this);
+        m_folderProxyModel->setSourceModel(m_folderModel);
+        m_contentProxyModel = new AssetFilterProxyModel(this);
+        m_contentProxyModel->setSourceModel(m_contentModel);
+
         auto* folderTreeView = new AssetFolderTreeView(splitter);
         m_folderTreeView = folderTreeView;
-        m_folderTreeView->setModel(m_folderModel);
+        m_folderTreeView->setModel(m_folderProxyModel);
         m_folderTreeView->setRootIndex(
-            m_folderModel->index(QFileInfo(m_contentRootPath).absolutePath())
+            m_folderProxyModel->mapFromSource(m_folderModel->index(QFileInfo(m_contentRootPath).absolutePath()))
         );
         QModelIndex projectIndex = m_folderModel->index(m_contentRootPath);
-        m_folderTreeView->expand(projectIndex);
+        m_folderTreeView->expand(m_folderProxyModel->mapFromSource(projectIndex));
         m_folderTreeView->setHeaderHidden(true);
         m_folderTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
         m_folderTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -238,13 +275,14 @@ namespace NexusEditor
         m_folderTreeView->setDropIndicatorShown(true);
         m_folderTreeView->setDragDropMode(QAbstractItemView::DragDrop);
         m_folderTreeView->setDefaultDropAction(Qt::MoveAction);
-        for (int column = 1; column < m_folderModel->columnCount(); ++column)
+        for (int column = 1; column < m_folderProxyModel->columnCount(); ++column)
         {
             m_folderTreeView->hideColumn(column);
         }
         folderTreeView->m_getPath = [this](const QModelIndex& index)
         {
-            return index.isValid() ? m_folderModel->filePath(index) : m_currentFolderPath;
+            const QModelIndex sourceIndex = ToSourceIndex(index);
+            return sourceIndex.isValid() ? m_folderModel->filePath(sourceIndex) : m_currentFolderPath;
         };
         folderTreeView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
@@ -272,7 +310,7 @@ namespace NexusEditor
 
         auto* contentListView = new AssetContentListView(contentPane);
         m_contentListView = contentListView;
-        m_contentListView->setModel(m_contentModel);
+        m_contentListView->setModel(m_contentProxyModel);
         m_contentListView->setViewMode(QListView::IconMode);
         m_contentListView->setResizeMode(QListView::Adjust);
         m_contentListView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -287,11 +325,13 @@ namespace NexusEditor
         contentPaneLayout->addWidget(m_contentListView, 1);
         contentListView->m_getPath = [this](const QModelIndex& index)
         {
-            return index.isValid() ? m_contentModel->filePath(index) : m_currentFolderPath;
+            const QModelIndex sourceIndex = ToSourceIndex(index);
+            return sourceIndex.isValid() ? m_contentModel->filePath(sourceIndex) : m_currentFolderPath;
         };
         contentListView->m_isDirectory = [this](const QModelIndex& index)
         {
-            return index.isValid() && m_contentModel->isDir(index);
+            const QModelIndex sourceIndex = ToSourceIndex(index);
+            return sourceIndex.isValid() && m_contentModel->isDir(sourceIndex);
         };
         contentListView->m_onAssetMoved = [this](const QString& oldPath, const QString& newPath)
         {
@@ -308,7 +348,8 @@ namespace NexusEditor
         connect(m_folderTreeView, &QTreeView::clicked, this,
             [this](const QModelIndex& index)
             {
-                SetCurrentFolder(m_folderModel->filePath(index));
+                const QModelIndex sourceIndex = ToSourceIndex(index);
+                SetCurrentFolder(m_folderModel->filePath(sourceIndex));
             });
 
         connect(m_folderTreeView, &QWidget::customContextMenuRequested, this,
@@ -331,7 +372,8 @@ namespace NexusEditor
                     return;
                 }
 
-                const QFileInfo fileInfo = m_contentModel->fileInfo(index);
+                const QModelIndex sourceIndex = ToSourceIndex(index);
+                const QFileInfo fileInfo = m_contentModel->fileInfo(sourceIndex);
                 if (fileInfo.isDir())
                 {
                     SetCurrentFolder(fileInfo.absoluteFilePath());
@@ -352,13 +394,14 @@ namespace NexusEditor
                     return;
                 }
 
-                if (!index.isValid() || m_contentModel->isDir(index))
+                const QModelIndex sourceIndex = ToSourceIndex(index);
+                if (!sourceIndex.isValid() || m_contentModel->isDir(sourceIndex))
                 {
                     m_onAssetSelected(QString{});
                     return;
                 }
 
-                const QString filePath = m_contentModel->filePath(index);
+                const QString filePath = m_contentModel->filePath(sourceIndex);
                 m_onAssetSelected(IsMaterialAssetFilePath(filePath) ? filePath : QString{});
             });
 
@@ -406,9 +449,11 @@ namespace NexusEditor
     void ContentDrawerWidget::SetCurrentFolder(const QString& folderPath)
     {
         const QString resolvedPath = folderPath.isEmpty() ? m_contentRootPath : QDir::cleanPath(folderPath);
-        const QModelIndex folderIndex = m_folderModel->index(resolvedPath);
-        const QModelIndex contentIndex = m_contentModel->index(resolvedPath);
-        if (!folderIndex.isValid() || !contentIndex.isValid())
+        const QModelIndex folderSourceIndex = m_folderModel->index(resolvedPath);
+        const QModelIndex contentSourceIndex = m_contentModel->index(resolvedPath);
+        const QModelIndex folderIndex = m_folderProxyModel->mapFromSource(folderSourceIndex);
+        const QModelIndex contentIndex = m_contentProxyModel->mapFromSource(contentSourceIndex);
+        if (!folderSourceIndex.isValid() || !contentSourceIndex.isValid() || !folderIndex.isValid() || !contentIndex.isValid())
         {
             return;
         }
@@ -475,7 +520,8 @@ namespace NexusEditor
     void ContentDrawerWidget::ShowFolderContextMenu(const QPoint& position)
     {
         const QModelIndex index = m_folderTreeView->indexAt(position);
-        const QString folderPath = index.isValid() ? m_folderModel->filePath(index) : m_contentRootPath;
+        const QModelIndex sourceIndex = ToSourceIndex(index);
+        const QString folderPath = sourceIndex.isValid() ? m_folderModel->filePath(sourceIndex) : m_contentRootPath;
 
         QMenu menu(this);
         QMenu* createMenu = menu.addMenu(QStringLiteral("Create"));
@@ -494,10 +540,11 @@ namespace NexusEditor
     void ContentDrawerWidget::ShowContentContextMenu(const QPoint& position)
     {
         const QModelIndex index = m_contentListView->indexAt(position);
-        QString targetDirectory = m_contentModel->filePath(m_contentListView->rootIndex());
-        if (index.isValid() && m_contentModel->isDir(index))
+        QString targetDirectory = m_contentModel->filePath(ToSourceIndex(m_contentListView->rootIndex()));
+        const QModelIndex sourceIndex = ToSourceIndex(index);
+        if (sourceIndex.isValid() && m_contentModel->isDir(sourceIndex))
         {
-            targetDirectory = m_contentModel->filePath(index);
+            targetDirectory = m_contentModel->filePath(sourceIndex);
         }
 
         QMenu menu(this);
@@ -508,8 +555,8 @@ namespace NexusEditor
 
         if (index.isValid())
         {
-            menu.addAction(QStringLiteral("Rename"), this, [this, index]() { RenameIndex(index); });
-            menu.addAction(QStringLiteral("Delete"), this, [this, index]() { DeleteIndex(index); });
+            menu.addAction(QStringLiteral("Rename"), this, [this, sourceIndex]() { RenameIndex(sourceIndex); });
+            menu.addAction(QStringLiteral("Delete"), this, [this, sourceIndex]() { DeleteIndex(sourceIndex); });
         }
 
         menu.exec(m_contentListView->viewport()->mapToGlobal(position));
@@ -627,13 +674,19 @@ namespace NexusEditor
             return;
         }
 
-        if (index.model() == m_folderModel)
+        const QModelIndex sourceIndex = ToSourceIndex(index);
+        if (!sourceIndex.isValid())
         {
-            m_folderTreeView->edit(index);
             return;
         }
 
-        m_contentListView->edit(index);
+        if (index.model() == m_folderModel)
+        {
+            m_folderTreeView->edit(m_folderProxyModel->mapFromSource(sourceIndex));
+            return;
+        }
+
+        m_contentListView->edit(m_contentProxyModel->mapFromSource(sourceIndex));
     }
 
     void ContentDrawerWidget::DeleteIndex(const QModelIndex& index)
@@ -643,20 +696,21 @@ namespace NexusEditor
             return;
         }
 
-        const QFileSystemModel* model = qobject_cast<const QFileSystemModel*>(index.model());
-        const QString path = model ? QDir::cleanPath(model->filePath(index)) : QString{};
+        const QModelIndex sourceIndex = ToSourceIndex(index);
+        const QFileSystemModel* model = qobject_cast<const QFileSystemModel*>(sourceIndex.model());
+        const QString path = model ? QDir::cleanPath(model->filePath(sourceIndex)) : QString{};
         if (!path.isEmpty() && m_onAssetDeleted)
         {
             m_onAssetDeleted(path);
         }
 
-        if (index.model() == m_folderModel)
+        if (sourceIndex.model() == m_folderModel)
         {
-            m_folderModel->remove(index);
+            m_folderModel->remove(sourceIndex);
             return;
         }
 
-        m_contentModel->remove(index);
+        m_contentModel->remove(sourceIndex);
     }
 
     void ContentDrawerWidget::DeleteSelectedFolderIndexes()
@@ -670,12 +724,13 @@ namespace NexusEditor
         const QModelIndexList selectedIndexes = m_folderTreeView->selectionModel()->selectedRows();
         for (const QModelIndex& index : selectedIndexes)
         {
-            if (!index.isValid())
+            const QModelIndex sourceIndex = ToSourceIndex(index);
+            if (!sourceIndex.isValid())
             {
                 continue;
             }
 
-            const QString path = QDir::cleanPath(m_folderModel->filePath(index));
+            const QString path = QDir::cleanPath(m_folderModel->filePath(sourceIndex));
             if (!path.isEmpty() && !paths.contains(path))
             {
                 paths.push_back(path);
@@ -696,12 +751,13 @@ namespace NexusEditor
         const QModelIndexList selectedIndexes = m_contentListView->selectionModel()->selectedIndexes();
         for (const QModelIndex& index : selectedIndexes)
         {
-            if (!index.isValid())
+            const QModelIndex sourceIndex = ToSourceIndex(index);
+            if (!sourceIndex.isValid())
             {
                 continue;
             }
 
-            const QString path = QDir::cleanPath(m_contentModel->filePath(index));
+            const QString path = QDir::cleanPath(m_contentModel->filePath(sourceIndex));
             if (!path.isEmpty() && !paths.contains(path))
             {
                 paths.push_back(path);
@@ -753,6 +809,27 @@ namespace NexusEditor
 
     bool ContentDrawerWidget::IsSceneIndex(const QModelIndex& index) const
     {
-        return index.isValid() && !m_contentModel->isDir(index) && IsSceneFilePath(m_contentModel->filePath(index));
+        const QModelIndex sourceIndex = ToSourceIndex(index);
+        return sourceIndex.isValid() && !m_contentModel->isDir(sourceIndex) && IsSceneFilePath(m_contentModel->filePath(sourceIndex));
+    }
+
+    QModelIndex ContentDrawerWidget::ToSourceIndex(const QModelIndex& index) const
+    {
+        if (!index.isValid())
+        {
+            return {};
+        }
+
+        if (index.model() == m_folderProxyModel)
+        {
+            return m_folderProxyModel->mapToSource(index);
+        }
+
+        if (index.model() == m_contentProxyModel)
+        {
+            return m_contentProxyModel->mapToSource(index);
+        }
+
+        return index;
     }
 } // namespace NexusEditor

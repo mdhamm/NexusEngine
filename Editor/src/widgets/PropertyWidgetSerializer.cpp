@@ -297,6 +297,7 @@ namespace NexusEditor
             {
                 const std::string fieldName = field.m_meta ? field.m_meta->m_name : std::string{};
                 const QString objectName = MakePropertyControlObjectName(metadata.m_name, fieldName);
+                PropertyWidget& propertyWidget = context.GetPropertyWidget();
                 auto* container = new QWidget(parent);
                 container->setObjectName(objectName);
 
@@ -306,7 +307,7 @@ namespace NexusEditor
 
                 auto* lineEdit = new AssetReferenceDropLineEdit(container);
                 lineEdit->setAcceptDrops(true);
-                lineEdit->setText(QString::fromStdString(NexusEngine::ReadFieldText(field).value_or(std::string{})));
+                lineEdit->setText(propertyWidget.GetAssetReferenceDisplayPath(NexusEngine::ReadFieldText(field).value_or(std::string{})));
                 lineEdit->setReadOnly(true);
                 layout->addWidget(lineEdit, 1);
 
@@ -318,7 +319,6 @@ namespace NexusEditor
                 layout->addWidget(clearButton);
 
                 const NexusEngine::AssetType assetType = *field.m_meta->m_assetType;
-                PropertyWidget& propertyWidget = context.GetPropertyWidget();
                 const NexusEngine::ComponentMetadata* metadataPtr = &metadata;
 
                 auto assignAssetPath = [metadataPtr, entity, fieldName, lineEdit, &propertyWidget, assetType](const QString& assetPath)
@@ -328,13 +328,12 @@ namespace NexusEditor
                         return false;
                     }
 
-                    const QString normalizedPath = propertyWidget.NormalizeAssetPath(assetPath);
-                    if (!NexusEngine::WriteFieldText(*metadataPtr, entity, fieldName, normalizedPath.toStdString()))
+                    if (!propertyWidget.AssignAssetReferencePath(*metadataPtr, entity, fieldName, assetPath))
                     {
                         return false;
                     }
 
-                    lineEdit->setText(normalizedPath);
+                    lineEdit->setText(propertyWidget.NormalizeAssetPath(assetPath));
                     propertyWidget.ClearAssetReferencePick();
                     return true;
                 };
@@ -380,7 +379,8 @@ namespace NexusEditor
                     return;
                 }
 
-                const QString newValue = QString::fromStdString(NexusEngine::ReadFieldText(field).value_or(std::string{}));
+                PropertyWidget& propertyWidget = context.GetPropertyWidget();
+                const QString newValue = propertyWidget.GetAssetReferenceDisplayPath(NexusEngine::ReadFieldText(field).value_or(std::string{}));
                 QSignalBlocker blocker(lineEdit);
                 if (lineEdit->text() != newValue)
                 {
@@ -393,7 +393,6 @@ namespace NexusEditor
                     button->setEnabled(!isReadOnly);
                 }
 
-                PropertyWidget& propertyWidget = context.GetPropertyWidget();
                 container->setStyleSheet(propertyWidget.IsAssetReferencePickActive(container->objectName())
                     ? QStringLiteral("QWidget { border: 1px solid palette(highlight); border-radius: 3px; }")
                     : QString{});

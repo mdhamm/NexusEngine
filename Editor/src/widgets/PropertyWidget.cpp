@@ -26,6 +26,8 @@
 #include <reflection/EntityReflection.h>
 #include <reflection/MetadataHelpers.h>
 
+#include <filesystem/AssetReferenceRegistry.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -158,8 +160,7 @@ namespace NexusEditor
             return false;
         }
 
-        const QString normalizedPath = NormalizeAssetPath(assetPath);
-        if (!NexusEngine::WriteFieldText(*metadata, entity, m_pendingAssetReferencePick->m_fieldName, normalizedPath.toStdString()))
+        if (!AssignAssetReferencePath(*metadata, entity, m_pendingAssetReferencePick->m_fieldName, assetPath))
         {
             return false;
         }
@@ -354,6 +355,67 @@ namespace NexusEditor
         assetPaths.removeDuplicates();
         assetPaths.sort(Qt::CaseInsensitive);
         return assetPaths;
+    }
+
+    QString PropertyWidget::GetAssetReferenceDisplayPath(const std::string& assetReferenceGuid) const
+    {
+        if (!m_editorWindow || assetReferenceGuid.empty())
+        {
+            return {};
+        }
+
+        NexusEngine::Engine* engine = m_editorWindow->GetEngine();
+        if (!engine)
+        {
+            return {};
+        }
+
+        NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = engine->GetAssetReferenceRegistry();
+        if (!assetReferenceRegistry)
+        {
+            return {};
+        }
+
+        const std::filesystem::path resolvedPath = assetReferenceRegistry->ResolveAssetReferencePath(NexusEngine::IO::AssetReference{ assetReferenceGuid });
+        return resolvedPath.empty()
+            ? QString{}
+            : QString::fromStdWString(resolvedPath.wstring());
+    }
+
+    bool PropertyWidget::AssignAssetReferencePath(
+        const NexusEngine::ComponentMetadata& metadata,
+        const flecs::entity& entity,
+        const std::string& fieldName,
+        const QString& assetPath) const
+    {
+        if (!m_editorWindow)
+        {
+            return false;
+        }
+
+        NexusEngine::Engine* engine = m_editorWindow->GetEngine();
+        if (!engine)
+        {
+            return false;
+        }
+
+        NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = engine->GetAssetReferenceRegistry();
+        if (!assetReferenceRegistry)
+        {
+            return false;
+        }
+
+        const QString normalizedPath = NormalizeAssetPath(assetPath);
+        const QString absolutePath = QDir::cleanPath(QFileInfo(normalizedPath).isAbsolute()
+            ? normalizedPath
+            : QDir(m_editorWindow->GetProjectRootPath()).filePath(normalizedPath));
+        const NexusEngine::IO::AssetReference assetReference = assetReferenceRegistry->GetOrCreateAssetReferenceByPath(std::filesystem::path(absolutePath.toStdWString()));
+        if (assetReference.IsEmpty())
+        {
+            return false;
+        }
+
+        return NexusEngine::WriteFieldText(metadata, entity, fieldName, assetReference.GetGuid());
     }
 
     QString PropertyWidget::NormalizeAssetPath(const QString& assetPath) const

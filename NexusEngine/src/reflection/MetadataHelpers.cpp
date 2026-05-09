@@ -1,5 +1,7 @@
 #include "MetadataHelpers.h"
 
+#include "filesystem/AssetReference.h"
+
 #include <algorithm>
 #include <sstream>
 
@@ -133,6 +135,13 @@ namespace NexusEngine
                 : FieldValueKind::String;
         }
 
+        if (field.m_meta->m_type == std::type_index(typeid(IO::AssetReference)))
+        {
+            return field.m_meta->m_assetType.has_value()
+                ? FieldValueKind::AssetReference
+                : FieldValueKind::Unsupported;
+        }
+
         return FieldValueKind::Unsupported;
     }
 
@@ -183,7 +192,12 @@ namespace NexusEngine
         switch (GetFieldValueKind(field))
         {
         case FieldValueKind::String:
+            return *static_cast<const std::string*>(field.m_data);
         case FieldValueKind::AssetReference:
+            if (field.m_meta && field.m_meta->m_type == std::type_index(typeid(IO::AssetReference)))
+            {
+                return static_cast<const IO::AssetReference*>(field.m_data)->GetGuid();
+            }
             return *static_cast<const std::string*>(field.m_data);
         case FieldValueKind::NamedValue:
         {
@@ -264,7 +278,15 @@ namespace NexusEngine
         switch (GetFieldValueKind(*field))
         {
         case FieldValueKind::String:
+            *static_cast<std::string*>(field->m_data) = std::string(text);
+            return ApplyAfterWrite(metadata, entity, componentView.m_data);
         case FieldValueKind::AssetReference:
+            if (field->m_meta && field->m_meta->m_type == std::type_index(typeid(IO::AssetReference)))
+            {
+                static_cast<IO::AssetReference*>(field->m_data)->m_guid = std::string(text);
+                return ApplyAfterWrite(metadata, entity, componentView.m_data);
+            }
+
             *static_cast<std::string*>(field->m_data) = std::string(text);
             return ApplyAfterWrite(metadata, entity, componentView.m_data);
         case FieldValueKind::NamedValue:

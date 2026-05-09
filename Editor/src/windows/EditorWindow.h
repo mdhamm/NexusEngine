@@ -9,6 +9,8 @@
 #include <QDateTime>
 #include <QMainWindow>
 
+#include <string>
+
 namespace NexusEngine
 {
     struct Material;
@@ -102,9 +104,11 @@ namespace NexusEditor
         void ResolveMaterialAssets();
         void SetSceneMode(bool isSceneMode);
         void ConfigureEditorCamera();
-        bool ResolveSceneFilePath();
-        void SaveScene();
-        void SaveSceneAs();
+        QString ResolveSceneFilePath() const;
+        std::string CaptureActiveSceneSnapshot() const;
+        bool IsCurrentSceneDirty() const;
+        bool SaveScene();
+        bool SaveSceneAs();
 
         SceneViewWidget* m_sceneView = nullptr;
         SceneGraphWidget* m_sceneGraph = nullptr;
@@ -116,6 +120,7 @@ namespace NexusEditor
         QtInputBackend m_inputBackend;
         bool m_isSceneMode = true;
         bool m_hasLoadedScene = false;
+        std::string m_lastSavedSceneSnapshot;
 
         struct MaterialAssetCacheEntry
         {

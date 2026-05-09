@@ -20,7 +20,9 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QStatusBar>
 #include <QVBoxLayout>
 
@@ -279,6 +281,34 @@ namespace NexusEditor
             {
                 const std::string strSceneFilePath = sceneFilePath.toStdString();
 
+                const QString requestedScenePath = QDir::cleanPath(sceneFilePath);
+                const QString currentScenePath = ResolveSceneFilePath();
+                if (!currentScenePath.isEmpty() &&
+                    currentScenePath.compare(requestedScenePath, Qt::CaseInsensitive) == 0)
+                {
+                    return;
+                }
+
+                if (IsCurrentSceneDirty())
+                {
+                    const QMessageBox::StandardButton result = QMessageBox::question(
+                        this,
+                        QStringLiteral("Unsaved Changes"),
+                        QStringLiteral("Save changes to the current scene before opening %1?").arg(QFileInfo(requestedScenePath).fileName()),
+                        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+                        QMessageBox::Yes);
+
+                    if (result == QMessageBox::Cancel)
+                    {
+                        return;
+                    }
+
+                    if (result == QMessageBox::Yes && !SaveScene())
+                    {
+                        return;
+                    }
+                }
+
                 if (!LoadScene(strSceneFilePath))
                 {
                     statusBar()->showMessage(QStringLiteral("Failed to load scene %1").arg(sceneFilePath), 3000);
@@ -296,6 +326,7 @@ namespace NexusEditor
                 assert(!assetReference.IsEmpty());
                 
                 m_sceneFileReference = assetReference;
+                m_lastSavedSceneSnapshot = CaptureActiveSceneSnapshot();
                 if (m_sceneGraph)
                 {
                     m_sceneGraph->Refresh();
@@ -373,15 +404,24 @@ namespace NexusEditor
         activeScene->m_world.each<NexusEngine::RenderMeshComponent>(
             [this, factory](flecs::entity, NexusEngine::RenderMeshComponent& renderMesh)
             {
-                if (renderMesh.m_materialAssetPath.empty())
+                if (renderMesh.m_materialAssetReference.IsEmpty())
                 {
                     return;
                 }
 
-                const QString configuredPath = QString::fromStdString(renderMesh.m_materialAssetPath).trimmed();
-                const QString absolutePath = QDir::cleanPath(QFileInfo(configuredPath).isAbsolute()
-                    ? configuredPath
-                    : QDir(m_project.m_rootPath).filePath(configuredPath));
+                NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
+                if (!assetReferenceRegistry)
+                {
+                    return;
+                }
+
+                const std::filesystem::path resolvedPath = assetReferenceRegistry->ResolveAssetReferencePath(renderMesh.m_materialAssetReference);
+                if (resolvedPath.empty())
+                {
+                    return;
+                }
+
+                const QString absolutePath = QDir::cleanPath(QDir(m_project.m_rootPath).filePath(QString::fromStdWString(resolvedPath.wstring())));
 
                 const QFileInfo materialFileInfo(absolutePath);
                 if (!materialFileInfo.exists())
@@ -555,51 +595,71 @@ namespace NexusEditor
         }
     }
 
-    bool EditorWindow::ResolveSceneFilePath()
+    QString EditorWindow::ResolveSceneFilePath() const
     {
-        NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
+        NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = const_cast<NexusEngine::Engine&>(m_engine).GetAssetReferenceRegistry();
         if (!assetReferenceRegistry)
         {
-            return false;
+            return {};
         }
 
-        return !assetReferenceRegistry->ResolveAssetReferencePath(m_sceneFileReference).empty();
+        const std::filesystem::path resolvedPath = assetReferenceRegistry->ResolveAssetReferencePath(m_sceneFileReference);
+        if (resolvedPath.empty())
+        {
+            return {};
+        }
+
+        const QString pathText = QString::fromStdWString(resolvedPath.wstring());
+        return QDir::cleanPath(QFileInfo(pathText).isAbsolute()
+            ? pathText
+            : QDir(m_project.m_rootPath).filePath(pathText));
     }
 
-    void EditorWindow::SaveScene()
+    std::string EditorWindow::CaptureActiveSceneSnapshot() const
+    {
+        NexusEngine::Scene* activeScene = const_cast<NexusEngine::Engine&>(m_engine).ActiveScene();
+        return activeScene ? SerializeSceneToJsonText(*activeScene) : std::string{};
+    }
+
+    bool EditorWindow::IsCurrentSceneDirty() const
+    {
+        return !m_lastSavedSceneSnapshot.empty() && CaptureActiveSceneSnapshot() != m_lastSavedSceneSnapshot;
+    }
+
+    bool EditorWindow::SaveScene()
     {
         if (m_sceneFileReference.IsEmpty())
         {
-            SaveSceneAs();
-            return;
+            return SaveSceneAs();
         }
 
         NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
         if (!assetReferenceRegistry)
         {
             statusBar()->showMessage(QStringLiteral("Current scene file could not be found. Use Save Scene As..."), 3000);
-            return;
+            return false;
         }
 
         const std::filesystem::path resolvedPath = assetReferenceRegistry->ResolveAssetReferencePath(m_sceneFileReference);
         if (resolvedPath.empty())
         {
             statusBar()->showMessage(QStringLiteral("Current scene file could not be found. Use Save Scene As..."), 3000);
-            return;
+            return false;
         }
 
-        const QString scenePath = QDir(m_project.m_rootPath).filePath(QString::fromStdWString(resolvedPath.wstring()));
+        const QString scenePath = ResolveSceneFilePath();
         if (SaveActiveScene(scenePath, QString::fromStdString(m_sceneFileReference.GetGuid())))
         {
+            m_lastSavedSceneSnapshot = CaptureActiveSceneSnapshot();
             statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(scenePath), 3000);
+            return true;
         }
-        else
-        {
-            statusBar()->showMessage(QStringLiteral("Failed to save scene"), 3000);
-        }
+
+        statusBar()->showMessage(QStringLiteral("Failed to save scene"), 3000);
+        return false;
     }
 
-    void EditorWindow::SaveSceneAs()
+    bool EditorWindow::SaveSceneAs()
     {
         NexusEngine::IO::AssetReferenceRegistry* assetReferenceRegistry = m_engine.GetAssetReferenceRegistry();
         const std::filesystem::path currentPath = assetReferenceRegistry
@@ -615,7 +675,7 @@ namespace NexusEditor
 
         if (filePath.isEmpty())
         {
-            return;
+            return false;
         }
 
         NexusEngine::IO::AssetReference reference;
@@ -627,18 +687,19 @@ namespace NexusEditor
         if (reference.IsEmpty())
         {
             statusBar()->showMessage(QStringLiteral("Failed to create scene asset reference"), 3000);
-            return;
+            return false;
         }
 
         m_sceneFileReference = reference;
 
         if (SaveActiveScene(filePath, QString::fromStdString(m_sceneFileReference.GetGuid())))
         {
+            m_lastSavedSceneSnapshot = CaptureActiveSceneSnapshot();
             statusBar()->showMessage(QStringLiteral("Saved scene to %1").arg(filePath), 3000);
+            return true;
         }
-        else
-        {
-            statusBar()->showMessage(QStringLiteral("Failed to save scene"), 3000);
-        }
+
+        statusBar()->showMessage(QStringLiteral("Failed to save scene"), 3000);
+        return false;
     }
 } // namespace NexusEditor

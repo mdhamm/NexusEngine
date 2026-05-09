@@ -54,7 +54,7 @@ namespace NexusEngine::IO
                 return path;
             }
 
-            return path.parent_path() / (path.stem().string() + ".nmeta");
+            return path.parent_path() / (path.filename().string() + ".nmeta");
         }
     }
 
@@ -66,7 +66,7 @@ namespace NexusEngine::IO
         // Create a .nmeta file next to the asset to store the asset reference guid. This allows for O(1) lookup of the asset reference by path.
         success &= SaveToFile(
             assetReference,
-            path.parent_path() / (path.stem().string() + ".nmeta"),
+            GetAssetMetaFilePath(path),
             FileFormat::Json);
 
         if (!success)
