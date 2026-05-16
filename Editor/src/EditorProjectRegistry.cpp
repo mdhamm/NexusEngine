@@ -4,7 +4,10 @@
 #include <filesystem/FileIO.h>
 #include <serialization/ProjectSettingsSerialization.h>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
 
@@ -37,6 +40,18 @@ namespace NexusEditor
             }
 
             file.write(QJsonDocument(projectArray).toJson(QJsonDocument::Indented));
+            return file.error() == QFileDevice::NoError;
+        }
+
+        bool WriteTextFile(const QString& filePath, const QString& content)
+        {
+            QFile file(filePath);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+            {
+                return false;
+            }
+
+            file.write(content.toUtf8());
             return file.error() == QFileDevice::NoError;
         }
     }
@@ -107,12 +122,88 @@ namespace NexusEditor
         project.m_name = projectName.trimmed();
         project.m_rootPath = QDir::cleanPath(projectRootPath);
 
+        const QString sourceDirectoryPath = QDir(project.m_rootPath).filePath(QStringLiteral("src"));
+        if (!QDir().mkpath(sourceDirectoryPath))
+        {
+            return false;
+        }
+
         NexusEngine::ProjectSettings projectSettings{};
         projectSettings.m_name = project.m_name.toStdString();
         projectSettings.m_defaultScene = NexusEngine::IO::AssetReference{}; // No default scene
 
         const QString projectFilePath = GetProjectFilePath(project.m_rootPath);
         if (!NexusEngine::IO::SaveToFile(projectSettings, std::filesystem::path(projectFilePath.toStdWString()), NexusEngine::IO::FileFormat::Json))
+        {
+            return false;
+        }
+
+        const QString cmakeListsPath = QDir(project.m_rootPath).filePath(QStringLiteral("CMakeLists.txt"));
+        const QString workspaceRootPath = QDir::cleanPath(QStringLiteral(NEXUS_EDITOR_CONTENT_ROOT)).replace('\\', '/');
+        const QString cmakeListsContents = QStringLiteral(
+            "cmake_minimum_required(VERSION 3.20)\n"
+            "project(ProjectGameHost LANGUAGES CXX)\n\n"
+            "set(CMAKE_CXX_STANDARD 20)\n"
+            "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n\n"
+            "set(NEXUS_BUILD_EDITOR OFF CACHE BOOL \"\" FORCE)\n"
+            "add_subdirectory(\"%1\" NexusWorkspace)\n\n"
+            "add_library(ProjectGame SHARED\n"
+            "    src/Game.cpp\n"
+            ")\n\n"
+            "target_link_libraries(ProjectGame PRIVATE NexusEngine)\n"
+            "target_include_directories(ProjectGame PRIVATE\n"
+            "    \"%1/NexusEngine/src\"\n"
+            ")\n"
+            "target_compile_definitions(ProjectGame PRIVATE PROJECTGAME_EXPORTS)\n")
+            .arg(workspaceRootPath);
+        if (!WriteTextFile(cmakeListsPath, cmakeListsContents))
+        {
+            return false;
+        }
+
+        const QString gameSourcePath = QDir(sourceDirectoryPath).filePath(QStringLiteral("Game.cpp"));
+        const QString gameSourceContents = QStringLiteral(
+            "#include <NexusEngine.h>\n"
+            "#include <vector>\n\n"
+            "#if defined(_WIN32)\n"
+            "#if defined(PROJECTGAME_EXPORTS)\n"
+            "#define PROJECTGAME_API __declspec(dllexport)\n"
+            "#else\n"
+            "#define PROJECTGAME_API __declspec(dllimport)\n"
+            "#endif\n"
+            "#else\n"
+            "#define PROJECTGAME_API\n"
+            "#endif\n\n"
+            "namespace\n"
+            "{\n"
+            "    class ProjectGame final : public NexusEngine::IGameApp\n"
+            "    {\n"
+            "    public:\n"
+            "        void RegisterComponentMetadata(flecs::world& world, NexusEngine::MetadataRegistry& metadataRegistry) override\n"
+            "        {\n"
+            "            REF(world);\n"
+            "            REF(metadataRegistry);\n"
+            "        }\n\n"
+            "        void UnregisterComponentMetadata(NexusEngine::MetadataRegistry& metadataRegistry) override\n"
+            "        {\n"
+            "            REF(metadataRegistry);\n"
+            "        }\n\n"
+            "        std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine) override\n"
+            "        {\n"
+            "            REF(engine);\n"
+            "            return {};\n"
+            "        }\n"
+            "    };\n"
+            "}\n\n"
+            "extern \"C\" PROJECTGAME_API NexusEngine::IGameApp* LoadGame()\n"
+            "{\n"
+            "    return new ProjectGame();\n"
+            "}\n\n"
+            "extern \"C\" PROJECTGAME_API void UnloadGame(NexusEngine::IGameApp* game)\n"
+            "{\n"
+            "    delete game;\n"
+            "}\n");
+        if (!WriteTextFile(gameSourcePath, gameSourceContents))
         {
             return false;
         }

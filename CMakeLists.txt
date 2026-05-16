@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
+set(NEXUS_WORKSPACE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "Nexus workspace root directory")
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 function(prefix_folder_recursive dir prefix)

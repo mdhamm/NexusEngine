@@ -11,8 +11,8 @@ add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/serialization/Projec
 
 target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentTools/ThirdParty/json/include
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentTools/ThirdParty/json/include
 )
 
 target_compile_definitions(NexusEngine
@@ -48,11 +48,11 @@ else()
 endif()
 
 target_include_directories(NexusEngine PRIVATE
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Common/interface
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsEngine/interface
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsTools/interface
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsAccessories/interface
-  ${CMAKE_SOURCE_DIR}/extern/DiligentEngine/DiligentCore/Platforms/Basic/interface
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentCore/Common/interface
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsEngine/interface
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsTools/interface
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentCore/Graphics/GraphicsAccessories/interface
+  ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentCore/Platforms/Basic/interface
 )
 
 if(BUILD_WEB)

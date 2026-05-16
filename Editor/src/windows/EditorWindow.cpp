@@ -1,6 +1,5 @@
 #include "EditorWindow.h"
 
-#include "EditorSceneApp.h"
 #include "EditorSceneSerializer.h"
 #include "widgets/ContentDrawerWidget.h"
 #include "widgets/PropertyWidget.h"
@@ -20,9 +19,15 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
+#include <QCoreApplication>
+#include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPlainTextEdit>
+#include <QProcess>
+#include <QProcessEnvironment>
 #include <QStatusBar>
 #include <QVBoxLayout>
 
@@ -48,6 +53,99 @@
 
 namespace NexusEditor
 {
+    namespace
+    {
+        QString GetWorkspaceCMakeCacheValue(const QString& key)
+        {
+            const QString cachePath = QDir(QStringLiteral(NEXUS_EDITOR_CONTENT_ROOT)).filePath(QStringLiteral("out/build/x64-debug/CMakeCache.txt"));
+            QFile cacheFile(cachePath);
+            if (!cacheFile.open(QIODevice::ReadOnly | QIODevice::Text))
+            {
+                return {};
+            }
+
+            const QByteArray keyPrefix = key.toUtf8() + ':';
+            while (!cacheFile.atEnd())
+            {
+                const QByteArray line = cacheFile.readLine().trimmed();
+                if (!line.startsWith(keyPrefix))
+                {
+                    continue;
+                }
+
+                const int equalsIndex = line.indexOf('=');
+                if (equalsIndex < 0)
+                {
+                    return {};
+                }
+
+                return QString::fromUtf8(line.mid(equalsIndex + 1));
+            }
+
+            return {};
+        }
+
+        QString QuoteForCmd(const QString& value)
+        {
+            QString escapedValue = value;
+            escapedValue.replace('"', QStringLiteral(""""));
+            return QStringLiteral("\"%1\"").arg(escapedValue);
+        }
+
+        QString QuoteCommandArgument(const QString& value)
+        {
+            QString escapedValue = value;
+            escapedValue.replace('"', QStringLiteral("\\\""));
+            return QStringLiteral("\"%1\"").arg(escapedValue);
+        }
+
+        QString BuildCommandString(const QString& executable, const QStringList& arguments)
+        {
+            QStringList commandParts;
+            commandParts.push_back(QuoteCommandArgument(executable));
+            for (const QString& argument : arguments)
+            {
+                commandParts.push_back(QuoteCommandArgument(argument));
+            }
+
+            return commandParts.join(' ');
+        }
+
+        void StartCmdProcess(QProcess& process, const QString& command)
+        {
+            process.setProgram(QStringLiteral("cmd.exe"));
+            process.setNativeArguments(QStringLiteral("/c ") + command);
+            process.start();
+        }
+
+        QString TryGetVcVars64Path(const QString& toolPath)
+        {
+            if (toolPath.isEmpty())
+            {
+                return {};
+            }
+
+            std::filesystem::path currentPath = std::filesystem::path(toolPath.toStdWString()).parent_path();
+            while (!currentPath.empty())
+            {
+                if (currentPath.filename() == L"VC")
+                {
+                    const std::filesystem::path vcvarsPath = currentPath / L"Auxiliary" / L"Build" / L"vcvars64.bat";
+                    if (std::filesystem::exists(vcvarsPath))
+                    {
+                        return QString::fromStdWString(vcvarsPath.wstring());
+                    }
+
+                    break;
+                }
+
+                currentPath = currentPath.parent_path();
+            }
+
+            return {};
+        }
+    }
+
     EditorWindow::EditorWindow(const EditorProject& project, QWidget* parent)
         : QMainWindow(parent)
         , m_project(project)
@@ -72,6 +170,13 @@ namespace NexusEditor
 
     EditorWindow::~EditorWindow()
     {
+        if (m_projectGameBuildProcess)
+        {
+            m_projectGameBuildProcess->kill();
+            m_projectGameBuildProcess->deleteLater();
+            m_projectGameBuildProcess = nullptr;
+        }
+
         UnloadHotReloadedGame();
         if (m_engine.IsInitialized())
         {
@@ -192,6 +297,8 @@ namespace NexusEditor
         connect(saveAction, &QAction::triggered, this, [this]() { SaveScene(); });
         auto* saveAsAction = fileMenu->addAction(QStringLiteral("Save Scene &As..."));
         connect(saveAsAction, &QAction::triggered, this, [this]() { SaveSceneAs(); });
+        auto* buildOutputAction = fileMenu->addAction(QStringLiteral("&Build Output"));
+        connect(buildOutputAction, &QAction::triggered, this, [this]() { ShowBuildOutput(); });
         fileMenu->addSeparator();
         auto* hotReloadGameAction = fileMenu->addAction(QStringLiteral("&Hot Reload Game"));
         connect(hotReloadGameAction, &QAction::triggered, this, [this]() { HotReloadGame(); });
@@ -258,6 +365,14 @@ namespace NexusEditor
         m_sceneGraph = new SceneGraphWidget(*this, sceneGraphDock);
         sceneGraphDock->setWidget(m_sceneGraph);
         addDockWidget(Qt::LeftDockWidgetArea, sceneGraphDock);
+
+        m_buildOutputDock = new QDockWidget(QStringLiteral("Build Output"), this);
+        m_buildOutputDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
+        m_buildOutputTextEdit = new QPlainTextEdit(m_buildOutputDock);
+        m_buildOutputTextEdit->setReadOnly(true);
+        m_buildOutputDock->setWidget(m_buildOutputTextEdit);
+        addDockWidget(Qt::BottomDockWidgetArea, m_buildOutputDock);
+        m_buildOutputDock->hide();
 
         // Property Editor
         auto* propertyDock = new QDockWidget(QStringLiteral("Properties"), this);
@@ -541,27 +656,285 @@ namespace NexusEditor
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
         m_engine.Initialize(nativeWindow, m_project.m_rootPath.toStdString());
 
-        static EditorSceneApp editorSceneApp;
-        m_engine.LoadGame(editorSceneApp);
+        (void)BuildAndLoadProjectGame();
 
         NexusEngine::Scene& sceneRef = m_engine.CreateScene("EditorScene");
         m_engine.SetActiveScene(sceneRef);
     }
 
-    bool EditorWindow::HotReloadGame()
+    void EditorWindow::ShowBuildOutput()
     {
-        const QString dllPath = QFileDialog::getOpenFileName(
-            this,
-            QStringLiteral("Select Game DLL"),
-            m_project.m_rootPath,
-            QStringLiteral("Dynamic Libraries (*.dll)"));
+        if (!m_buildOutputDock)
+        {
+            return;
+        }
 
-        if (dllPath.isEmpty())
+        m_buildOutputDock->show();
+        m_buildOutputDock->raise();
+    }
+
+    void EditorWindow::AppendBuildOutput(const QString& text)
+    {
+        if (text.isEmpty())
+        {
+            return;
+        }
+
+        const auto appendToTextEdit = [&](QPlainTextEdit* textEdit)
+        {
+            if (!textEdit)
+            {
+                return;
+            }
+
+            textEdit->appendPlainText(text);
+            QTextCursor cursor = textEdit->textCursor();
+            cursor.movePosition(QTextCursor::End);
+            textEdit->setTextCursor(cursor);
+        };
+
+        appendToTextEdit(m_buildOutputTextEdit);
+        appendToTextEdit(m_loadingStatusTextEdit);
+    }
+
+    void EditorWindow::ShowLoadingStatus(const QString& text)
+    {
+        if (!m_loadingStatusDialog)
+        {
+            m_loadingStatusDialog = new QDialog(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+            m_loadingStatusDialog->setWindowTitle(QStringLiteral("Loading Project"));
+            m_loadingStatusDialog->setModal(true);
+            m_loadingStatusDialog->resize(700, 420);
+
+            auto* layout = new QVBoxLayout(m_loadingStatusDialog);
+            m_loadingStatusLabel = new QLabel(m_loadingStatusDialog);
+            layout->addWidget(m_loadingStatusLabel);
+
+            m_loadingStatusTextEdit = new QPlainTextEdit(m_loadingStatusDialog);
+            m_loadingStatusTextEdit->setReadOnly(true);
+            layout->addWidget(m_loadingStatusTextEdit, 1);
+        }
+
+        if (m_loadingStatusLabel)
+        {
+            m_loadingStatusLabel->setText(text);
+        }
+
+        if (m_loadingStatusTextEdit && !m_loadingStatusDialog->isVisible())
+        {
+            m_loadingStatusTextEdit->clear();
+        }
+
+        m_loadingStatusDialog->show();
+        m_loadingStatusDialog->raise();
+    }
+
+    void EditorWindow::HideLoadingStatus()
+    {
+        if (m_loadingStatusDialog)
+        {
+            m_loadingStatusDialog->hide();
+        }
+    }
+
+    bool EditorWindow::BuildProjectGame()
+    {
+        if (m_projectGameBuildProcess)
+        {
+            AppendBuildOutput(QStringLiteral("A project game build is already in progress."));
+            ShowBuildOutput();
+            return false;
+        }
+
+        const std::filesystem::path projectRoot = std::filesystem::path(m_project.m_rootPath.toStdWString());
+        const std::filesystem::path buildDirectory = GetProjectGameBuildDirectory();
+
+        if (m_buildOutputTextEdit)
+        {
+            m_buildOutputTextEdit->clear();
+        }
+
+        AppendBuildOutput(QStringLiteral("Configuring project game build..."));
+        AppendBuildOutput(QStringLiteral("Working directory: %1").arg(QString::fromStdWString(projectRoot.wstring())));
+        AppendBuildOutput(QStringLiteral("Build directory: %1").arg(QString::fromStdWString(buildDirectory.wstring())));
+        ShowLoadingStatus(QStringLiteral("Configuring project game build..."));
+
+        const QString rcCompilerPath = GetWorkspaceCMakeCacheValue(QStringLiteral("CMAKE_RC_COMPILER"));
+        const QString mtPath = GetWorkspaceCMakeCacheValue(QStringLiteral("CMAKE_MT"));
+        const QString makeProgramPath = GetWorkspaceCMakeCacheValue(QStringLiteral("CMAKE_MAKE_PROGRAM"));
+        const QString linkerPath = GetWorkspaceCMakeCacheValue(QStringLiteral("CMAKE_LINKER"));
+        const QString vcvarsPath = TryGetVcVars64Path(linkerPath);
+        if (!rcCompilerPath.isEmpty())
+        {
+            AppendBuildOutput(QStringLiteral("Using RC compiler: %1").arg(rcCompilerPath));
+        }
+        if (!mtPath.isEmpty())
+        {
+            AppendBuildOutput(QStringLiteral("Using manifest tool: %1").arg(mtPath));
+        }
+        if (!vcvarsPath.isEmpty())
+        {
+            AppendBuildOutput(QStringLiteral("Using VC environment script: %1").arg(vcvarsPath));
+        }
+
+        QProcessEnvironment processEnvironment = QProcessEnvironment::systemEnvironment();
+        QString pathValue = processEnvironment.value(QStringLiteral("PATH"));
+        const auto prependToolDirectoryToPath = [&](const QString& toolPath)
+        {
+            if (toolPath.isEmpty())
+            {
+                return;
+            }
+
+            const QString toolDirectory = QFileInfo(toolPath).absolutePath();
+            if (toolDirectory.isEmpty())
+            {
+                return;
+            }
+
+            AppendBuildOutput(QStringLiteral("Adding tool directory to PATH: %1").arg(toolDirectory));
+            pathValue = toolDirectory + QDir::listSeparator() + pathValue;
+        };
+
+        prependToolDirectoryToPath(rcCompilerPath);
+        prependToolDirectoryToPath(mtPath);
+        prependToolDirectoryToPath(makeProgramPath);
+        processEnvironment.insert(QStringLiteral("PATH"), pathValue);
+        if (!rcCompilerPath.isEmpty())
+        {
+            processEnvironment.insert(QStringLiteral("RC"), rcCompilerPath);
+        }
+
+        std::error_code errorCode;
+        std::filesystem::create_directories(buildDirectory, errorCode);
+        if (errorCode)
+        {
+            AppendBuildOutput(QStringLiteral("Failed to create project game build directory: %1").arg(QString::fromStdString(errorCode.message())));
+            ShowBuildOutput();
+            statusBar()->showMessage(QStringLiteral("Failed to create project game build directory"), 3000);
+            return false;
+        }
+
+        m_projectGameBuildProcess = new QProcess(this);
+        m_projectGameBuildProcess->setWorkingDirectory(QString::fromStdWString(projectRoot.wstring()));
+        m_projectGameBuildProcess->setProcessEnvironment(processEnvironment);
+        QStringList configureArguments = {
+            QStringLiteral("-S"),
+            QStringLiteral("."),
+            QStringLiteral("-B"),
+            QString::fromStdWString(buildDirectory.wstring()),
+            QStringLiteral("-G"),
+            QStringLiteral("Ninja"),
+            QStringLiteral("-DCMAKE_RC_COMPILER:FILEPATH=%1").arg(rcCompilerPath),
+            QStringLiteral("-DCMAKE_MT:FILEPATH=%1").arg(mtPath)
+        };
+        QString configureCommand = BuildCommandString(QStringLiteral("cmake"), configureArguments);
+        if (!vcvarsPath.isEmpty())
+        {
+            configureCommand = QStringLiteral("call %1 >nul && %2").arg(QuoteForCmd(vcvarsPath), configureCommand);
+        }
+        StartCmdProcess(*m_projectGameBuildProcess, configureCommand);
+        connect(m_projectGameBuildProcess, &QProcess::readyReadStandardOutput, this,
+            [this]()
+            {
+                if (m_projectGameBuildProcess)
+                {
+                    AppendBuildOutput(QString::fromLocal8Bit(m_projectGameBuildProcess->readAllStandardOutput()));
+                }
+            });
+        connect(m_projectGameBuildProcess, &QProcess::readyReadStandardError, this,
+            [this]()
+            {
+                if (m_projectGameBuildProcess)
+                {
+                    AppendBuildOutput(QString::fromLocal8Bit(m_projectGameBuildProcess->readAllStandardError()));
+                }
+            });
+        while (m_projectGameBuildProcess->state() != QProcess::NotRunning)
+        {
+            QCoreApplication::processEvents();
+        }
+        if (m_projectGameBuildProcess->exitStatus() != QProcess::NormalExit || m_projectGameBuildProcess->exitCode() != 0)
+        {
+            AppendBuildOutput(QStringLiteral("Configure step failed with exit code %1.").arg(m_projectGameBuildProcess->exitCode()));
+            ShowBuildOutput();
+            HideLoadingStatus();
+            m_projectGameBuildProcess->deleteLater();
+            m_projectGameBuildProcess = nullptr;
+            statusBar()->showMessage(QStringLiteral("Failed to configure project game build"), 3000);
+            return false;
+        }
+
+        AppendBuildOutput(QStringLiteral("Building project game DLL..."));
+        ShowLoadingStatus(QStringLiteral("Building project game DLL..."));
+        m_projectGameBuildProcess->setWorkingDirectory(QString::fromStdWString(projectRoot.wstring()));
+        m_projectGameBuildProcess->setProcessEnvironment(processEnvironment);
+        QStringList buildArguments = {
+            QStringLiteral("--build"),
+            QString::fromStdWString(buildDirectory.wstring()),
+            QStringLiteral("--config"),
+            QStringLiteral("Debug"),
+            QStringLiteral("--target"),
+            QStringLiteral("ProjectGame")
+        };
+        QString buildCommand = BuildCommandString(QStringLiteral("cmake"), buildArguments);
+        if (!vcvarsPath.isEmpty())
+        {
+            buildCommand = QStringLiteral("call %1 >nul && %2").arg(QuoteForCmd(vcvarsPath), buildCommand);
+        }
+        StartCmdProcess(*m_projectGameBuildProcess, buildCommand);
+        while (m_projectGameBuildProcess->state() != QProcess::NotRunning)
+        {
+            QCoreApplication::processEvents();
+        }
+        if (m_projectGameBuildProcess->exitStatus() != QProcess::NormalExit || m_projectGameBuildProcess->exitCode() != 0)
+        {
+            AppendBuildOutput(QStringLiteral("Build step failed with exit code %1.").arg(m_projectGameBuildProcess->exitCode()));
+            ShowBuildOutput();
+            HideLoadingStatus();
+            m_projectGameBuildProcess->deleteLater();
+            m_projectGameBuildProcess = nullptr;
+            statusBar()->showMessage(QStringLiteral("Failed to build project game DLL"), 3000);
+            return false;
+        }
+
+        HideLoadingStatus();
+        m_projectGameBuildProcess->deleteLater();
+        m_projectGameBuildProcess = nullptr;
+        AppendBuildOutput(QStringLiteral("Project game build completed successfully."));
+        return true;
+    }
+
+    bool EditorWindow::BuildAndLoadProjectGame()
+    {
+        if (!BuildProjectGame())
         {
             return false;
         }
 
-        return LoadHotReloadedGame(std::filesystem::path(dllPath.toStdWString()));
+        const std::filesystem::path projectGameDllPath = GetProjectGameDllPath();
+        if (!std::filesystem::exists(projectGameDllPath))
+        {
+            statusBar()->showMessage(QStringLiteral("Built project game DLL was not found"), 3000);
+            return false;
+        }
+
+        return LoadHotReloadedGame(projectGameDllPath);
+    }
+
+    std::filesystem::path EditorWindow::GetProjectGameBuildDirectory() const
+    {
+        return std::filesystem::path(m_project.m_rootPath.toStdWString()) / L"build" / L"editor-game";
+    }
+
+    std::filesystem::path EditorWindow::GetProjectGameDllPath() const
+    {
+        return GetProjectGameBuildDirectory() / L"ProjectGame.dll";
+    }
+
+    bool EditorWindow::HotReloadGame()
+    {
+        return BuildAndLoadProjectGame();
     }
 
     bool EditorWindow::LoadHotReloadedGame(const std::filesystem::path& sourceDllPath)
@@ -594,8 +967,6 @@ namespace NexusEditor
             return false;
         }
 
-        const std::filesystem::path sourcePdbPath = sourceDirectory / sourceDllPath.stem();
-        const std::filesystem::path sourcePdbFilePath = sourcePdbPath;
         std::filesystem::path pdbPath = sourceDllPath;
         pdbPath.replace_extension(L".pdb");
         if (std::filesystem::exists(pdbPath))

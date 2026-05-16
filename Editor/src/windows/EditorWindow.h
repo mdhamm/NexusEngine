@@ -10,6 +10,11 @@
 #include <QMainWindow>
 
 struct HINSTANCE__;
+class QDialog;
+class QDockWidget;
+class QLabel;
+class QPlainTextEdit;
+class QProcess;
 
 #include <string>
 #include <functional>
@@ -118,10 +123,18 @@ namespace NexusEditor
     private:
         void BuildMenus();
         void BuildLayout();
+        void ShowBuildOutput();
+        void AppendBuildOutput(const QString& text);
+        void ShowLoadingStatus(const QString& text);
+        void HideLoadingStatus();
         void ResolveMaterialAssets();
         void SetSceneMode(bool isSceneMode);
         void ConfigureEditorCamera();
         void SetInspectedTarget(const InspectedTarget& inspectedTarget);
+        bool BuildProjectGame();
+        bool BuildAndLoadProjectGame();
+        std::filesystem::path GetProjectGameBuildDirectory() const;
+        std::filesystem::path GetProjectGameDllPath() const;
         bool HotReloadGame();
         bool LoadHotReloadedGame(const std::filesystem::path& sourceDllPath);
         void UnloadHotReloadedGame();
@@ -152,6 +165,12 @@ namespace NexusEditor
         };
 
         QHash<QString, MaterialAssetCacheEntry> m_materialAssetCache;
+        QDockWidget* m_buildOutputDock = nullptr;
+        QPlainTextEdit* m_buildOutputTextEdit = nullptr;
+        QDialog* m_loadingStatusDialog = nullptr;
+        QLabel* m_loadingStatusLabel = nullptr;
+        QPlainTextEdit* m_loadingStatusTextEdit = nullptr;
+        QProcess* m_projectGameBuildProcess = nullptr;
         HINSTANCE__* m_hotReloadedGameModule = nullptr;
         NexusEngine::IGameApp* m_hotReloadedGame = nullptr;
         std::filesystem::path m_hotReloadedGameCopyPath;

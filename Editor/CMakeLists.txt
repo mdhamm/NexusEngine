@@ -47,7 +47,6 @@ else()
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
     
-    src/EditorSceneApp.h
     src/EditorSceneSerializer.cpp
     src/EditorSceneSerializer.h
     src/FileExtensionInfo.cpp
