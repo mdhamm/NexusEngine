@@ -153,6 +153,7 @@ namespace NexusEditor
         EditorProject project;
         project.m_name = item->data(Qt::UserRole).toString();
         project.m_rootPath = item->data(Qt::UserRole + 1).toString();
+        project.m_requiresInitialBuild = item->data(Qt::UserRole + 2).toBool();
 
         EditorProjectRegistry::AddRecentProject(project);
         m_onProjectOpened(project);

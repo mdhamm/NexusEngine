@@ -2,6 +2,7 @@
 
 #include "Scene.h"
 #include "GameLoopPhases.h"
+#include "NexusEngineApi.h"
 #include "input/InputState.h"
 #include "filesystem/AssetReferenceRegistry.h"
 #include "rendering/GraphicsRenderer.h"
@@ -31,7 +32,7 @@ namespace NexusEngine
     class MetadataRegistry;
 
     // Game-facing interface implemented by runtime or sample code.
-    class IGameApp
+    class NEXUS_ENGINE_API IGameApp
     {
     public:
         virtual ~IGameApp() = default;
@@ -87,7 +88,7 @@ namespace NexusEngine
     };
 
     // Main engine entry point that owns rendering and scene lifetime.
-    class Engine
+    class NEXUS_ENGINE_API Engine
     {
     public:
         /// <summary>

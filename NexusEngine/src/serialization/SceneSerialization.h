@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NexusEngineApi.h"
 #include "Scene.h"
 
 namespace NexusEngine
@@ -7,8 +8,8 @@ namespace NexusEngine
     class ISerializeReader;
     class ISerializeWriter;
 
-    void Serialize(const Scene& scene, ISerializeWriter& writer);
+    NEXUS_ENGINE_API void Serialize(const Scene& scene, ISerializeWriter& writer);
 
-    bool Deserialize(Scene& scene, ISerializeReader& reader);
+    NEXUS_ENGINE_API bool Deserialize(Scene& scene, ISerializeReader& reader);
 
 } // namespace NexusEngine

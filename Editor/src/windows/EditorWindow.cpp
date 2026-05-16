@@ -1,5 +1,6 @@
 #include "EditorWindow.h"
 
+#include "EditorProjectRegistry.h"
 #include "EditorSceneSerializer.h"
 #include "widgets/ContentDrawerWidget.h"
 #include "widgets/PropertyWidget.h"
@@ -7,6 +8,7 @@
 #include "widgets/SceneViewWidget.h"
 
 #include <assets/MaterialAsset.h>
+#include <EngineComponentRegistration.h>
 #include <filesystem/AssetReferenceRegistry.h>
 #include <filesystem/FileIO.h>
 #include <components/CameraComponent.h>
@@ -57,7 +59,7 @@ namespace NexusEditor
     {
         QString GetWorkspaceCMakeCacheValue(const QString& key)
         {
-            const QString cachePath = QDir(QStringLiteral(NEXUS_EDITOR_CONTENT_ROOT)).filePath(QStringLiteral("out/build/x64-debug/CMakeCache.txt"));
+            const QString cachePath = QDir(QStringLiteral(NEXUS_EDITOR_CONTENT_ROOT)).filePath(QStringLiteral("Intermediate/x64-debug/CMakeCache.txt"));
             QFile cacheFile(cachePath);
             if (!cacheFile.open(QIODevice::ReadOnly | QIODevice::Text))
             {
@@ -144,6 +146,7 @@ namespace NexusEditor
 
             return {};
         }
+
     }
 
     EditorWindow::EditorWindow(const EditorProject& project, QWidget* parent)
@@ -655,8 +658,18 @@ namespace NexusEditor
         nativeWindow.m_height = std::max(1, m_sceneView->height());
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
         m_engine.Initialize(nativeWindow, m_project.m_rootPath.toStdString());
+        NexusEngine::RegisterEngineComponentTypes(m_engine.GetWorld());
 
-        (void)BuildAndLoadProjectGame();
+        if (m_project.m_requiresInitialBuild)
+        {
+            if (BuildProjectGame())
+            {
+                m_project.m_requiresInitialBuild = false;
+                EditorProjectRegistry::AddRecentProject(m_project);
+            }
+        }
+
+        (void)LoadProjectGameFromConfiguredOutput();
 
         NexusEngine::Scene& sceneRef = m_engine.CreateScene("EditorScene");
         m_engine.SetActiveScene(sceneRef);
@@ -747,7 +760,8 @@ namespace NexusEditor
         }
 
         const std::filesystem::path projectRoot = std::filesystem::path(m_project.m_rootPath.toStdWString());
-        const std::filesystem::path buildDirectory = GetProjectGameBuildDirectory();
+        const QString editorBuildConfigurationName = GetEditorBuildConfigurationName();
+        const std::filesystem::path buildDirectory = std::filesystem::path(m_project.m_rootPath.toStdWString()) / L"Intermediate" / std::filesystem::path(editorBuildConfigurationName.toStdWString());
 
         if (m_buildOutputTextEdit)
         {
@@ -811,6 +825,7 @@ namespace NexusEditor
         {
             AppendBuildOutput(QStringLiteral("Failed to create project game build directory: %1").arg(QString::fromStdString(errorCode.message())));
             ShowBuildOutput();
+            HideLoadingStatus();
             statusBar()->showMessage(QStringLiteral("Failed to create project game build directory"), 3000);
             return false;
         }
@@ -825,6 +840,8 @@ namespace NexusEditor
             QString::fromStdWString(buildDirectory.wstring()),
             QStringLiteral("-G"),
             QStringLiteral("Ninja"),
+            QStringLiteral("-DCMAKE_BUILD_TYPE:STRING=Debug"),
+            QStringLiteral("-DNEXUS_PROJECT_OUTPUT_SUBDIR:STRING=%1").arg(editorBuildConfigurationName),
             QStringLiteral("-DCMAKE_RC_COMPILER:FILEPATH=%1").arg(rcCompilerPath),
             QStringLiteral("-DCMAKE_MT:FILEPATH=%1").arg(mtPath)
         };
@@ -905,36 +922,89 @@ namespace NexusEditor
         return true;
     }
 
-    bool EditorWindow::BuildAndLoadProjectGame()
+    bool EditorWindow::LoadProjectGameFromConfiguredOutput()
     {
-        if (!BuildProjectGame())
+        if (m_buildOutputTextEdit)
         {
-            return false;
+            m_buildOutputTextEdit->clear();
         }
 
+        AppendBuildOutput(QStringLiteral("Loading project game from configured output..."));
+        ShowLoadingStatus(QStringLiteral("Loading project game from configured output..."));
         const std::filesystem::path projectGameDllPath = GetProjectGameDllPath();
-        if (!std::filesystem::exists(projectGameDllPath))
+        AppendBuildOutput(QStringLiteral("Configured DLL path: %1").arg(QString::fromStdWString(projectGameDllPath.wstring())));
+        if (projectGameDllPath.empty())
         {
-            statusBar()->showMessage(QStringLiteral("Built project game DLL was not found"), 3000);
+            AppendBuildOutput(QStringLiteral("Configured project game DLL was not found."));
+            for (const std::filesystem::path& candidatePath : GetProjectGameDllCandidatePaths())
+            {
+                AppendBuildOutput(QStringLiteral("Checked DLL path: %1").arg(QString::fromStdWString(candidatePath.wstring())));
+            }
+            ShowBuildOutput();
+            HideLoadingStatus();
+            statusBar()->showMessage(QStringLiteral("Configured project game DLL was not found"), 3000);
             return false;
         }
 
-        return LoadHotReloadedGame(projectGameDllPath);
+        const bool loaded = LoadHotReloadedGame(projectGameDllPath);
+        HideLoadingStatus();
+        return loaded;
     }
 
-    std::filesystem::path EditorWindow::GetProjectGameBuildDirectory() const
+    QString EditorWindow::GetEditorBuildConfigurationName() const
     {
-        return std::filesystem::path(m_project.m_rootPath.toStdWString()) / L"build" / L"editor-game";
+#ifdef NDEBUG
+        return QStringLiteral("editor-release");
+#else
+        return QStringLiteral("editor-debug");
+#endif
+    }
+
+    std::vector<std::filesystem::path> EditorWindow::GetProjectGameDllCandidatePaths() const
+    {
+        const std::filesystem::path projectRoot = std::filesystem::path(m_project.m_rootPath.toStdWString());
+        const std::wstring projectGameDllName = L"ProjectGame.dll";
+
+        std::vector<std::filesystem::path> candidatePaths;
+        const auto appendCandidate = [&](const std::wstring& subdirectoryName)
+        {
+            const std::filesystem::path candidatePath = projectRoot / L"Binaries" / subdirectoryName / projectGameDllName;
+            if (std::find(candidatePaths.begin(), candidatePaths.end(), candidatePath) == candidatePaths.end())
+            {
+                candidatePaths.push_back(candidatePath);
+            }
+        };
+
+        appendCandidate(GetEditorBuildConfigurationName().toStdWString());
+#ifdef NDEBUG
+        appendCandidate(L"x64-release");
+        appendCandidate(L"web-release");
+        appendCandidate(L"editor-release");
+#else
+        appendCandidate(L"x64-debug");
+        appendCandidate(L"web-debug");
+        appendCandidate(L"editor-debug");
+#endif
+
+        return candidatePaths;
     }
 
     std::filesystem::path EditorWindow::GetProjectGameDllPath() const
     {
-        return GetProjectGameBuildDirectory() / L"ProjectGame.dll";
+        for (const std::filesystem::path& candidatePath : GetProjectGameDllCandidatePaths())
+        {
+            if (std::filesystem::exists(candidatePath))
+            {
+                return candidatePath;
+            }
+        }
+
+        return {};
     }
 
     bool EditorWindow::HotReloadGame()
     {
-        return BuildAndLoadProjectGame();
+        return LoadProjectGameFromConfiguredOutput();
     }
 
     bool EditorWindow::LoadHotReloadedGame(const std::filesystem::path& sourceDllPath)

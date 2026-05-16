@@ -7,12 +7,22 @@ file(GLOB_RECURSE NEXUS_ENGINE_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/serialization/ProjectSettingsSerialization.cpp" "src/filesystem/AssetReference.cpp")
+if(NEXUS_EDITOR_MODE AND NOT BUILD_WEB)
+  add_library(NexusEngine SHARED ${NEXUS_ENGINE_SOURCES} "src/serialization/ProjectSettingsSerialization.cpp" "src/filesystem/AssetReference.cpp")
+  target_compile_definitions(NexusEngine PRIVATE NEXUS_ENGINE_EXPORTS)
+else()
+  add_library(NexusEngine STATIC ${NEXUS_ENGINE_SOURCES} "src/serialization/ProjectSettingsSerialization.cpp" "src/filesystem/AssetReference.cpp")
+endif()
 
 target_include_directories(NexusEngine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine
   ${NEXUS_WORKSPACE_ROOT}/extern/DiligentEngine/DiligentTools/ThirdParty/json/include
+)
+
+target_compile_definitions(NexusEngine
+  PUBLIC
+    $<$<BOOL:${NEXUS_EDITOR_MODE}>:NEXUS_EDITOR_MODE>
 )
 
 target_compile_definitions(NexusEngine
@@ -57,6 +67,8 @@ target_include_directories(NexusEngine PRIVATE
 
 if(BUILD_WEB)
   target_link_libraries(NexusEngine PRIVATE DILIGENT_WEBGPU)
+else()
+  target_link_libraries(NexusEngine PRIVATE DILIGENT_D3D12)
 endif()
 
 # SDL for the imgui_impl_sdl2 backend

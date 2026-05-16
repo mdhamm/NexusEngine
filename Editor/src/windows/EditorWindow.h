@@ -132,8 +132,9 @@ namespace NexusEditor
         void ConfigureEditorCamera();
         void SetInspectedTarget(const InspectedTarget& inspectedTarget);
         bool BuildProjectGame();
-        bool BuildAndLoadProjectGame();
-        std::filesystem::path GetProjectGameBuildDirectory() const;
+        bool LoadProjectGameFromConfiguredOutput();
+        QString GetEditorBuildConfigurationName() const;
+        std::vector<std::filesystem::path> GetProjectGameDllCandidatePaths() const;
         std::filesystem::path GetProjectGameDllPath() const;
         bool HotReloadGame();
         bool LoadHotReloadedGame(const std::filesystem::path& sourceDllPath);

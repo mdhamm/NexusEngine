@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NexusEngineApi.h"
 #include "ISerializer.h"
 
 #include <nlohmann/json_fwd.hpp>
@@ -13,7 +14,7 @@
 
 namespace NexusEngine
 {
-    class JsonSerializeWriter final : public ISerializeWriter
+    class NEXUS_ENGINE_API JsonSerializeWriter final : public ISerializeWriter
     {
     public:
         explicit JsonSerializeWriter(nlohmann::json& root);
@@ -41,7 +42,7 @@ namespace NexusEngine
         nlohmann::json* CreateArray(std::string_view name);
     };
 
-    class JsonSerializeReader final : public ISerializeReader
+    class NEXUS_ENGINE_API JsonSerializeReader final : public ISerializeReader
     {
     public:
         explicit JsonSerializeReader(const nlohmann::json& root);

@@ -1,12 +1,14 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace NexusEngine
 {
-    class ISerializeWriter {
+    class NEXUS_ENGINE_API ISerializeWriter {
     public:
         virtual ~ISerializeWriter() = default;
 
@@ -28,7 +30,7 @@ namespace NexusEngine
         virtual void Write(std::string_view name, std::string_view value) = 0;
     };
 
-    class ISerializeReader {
+    class NEXUS_ENGINE_API ISerializeReader {
     public:
         virtual ~ISerializeReader() = default;
 

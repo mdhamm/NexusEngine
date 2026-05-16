@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <flecs.h>
 
 #include <functional>
@@ -102,7 +104,7 @@ namespace NexusEngine
         std::unordered_map<TypeId, std::shared_ptr<IFieldHandler<TResult>>> m_handlers;
     };
 
-    class MetadataRegistry
+    class NEXUS_ENGINE_API MetadataRegistry
     {
     public:
         class FieldBuilder;

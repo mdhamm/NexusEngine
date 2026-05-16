@@ -11,5 +11,6 @@ namespace NexusEditor
         QString m_name;
         QString m_rootPath;
         NexusEngine::IO::AssetReference m_defaultScene;
+        bool m_requiresInitialBuild = false;
     };
 } // namespace NexusEditor

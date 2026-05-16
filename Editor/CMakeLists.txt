@@ -95,6 +95,13 @@ else()
       COMMENT "Deploying Qt runtime for Editor")
   endif()
 
+  if(WIN32)
+    add_custom_command(TARGET Editor POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:Editor> $<TARGET_FILE_DIR:Editor>
+      COMMAND_EXPAND_LISTS
+      COMMENT "Copying runtime DLLs for Editor")
+  endif()
+
   if(MSVC)
     target_compile_options(Editor PRIVATE /permissive- /Zc:__cplusplus /W4 /EHsc /bigobj)
   endif()

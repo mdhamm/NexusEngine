@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include "AssetReference.h"
 
 #include <filesystem>
@@ -7,7 +9,7 @@
 namespace NexusEngine::IO
 {
     // Manages the mapping between asset references (guids) and file paths. This allows assets to be referenced in a way that remains valid even if the asset is moved or renamed.
-    class AssetReferenceRegistry
+    class NEXUS_ENGINE_API AssetReferenceRegistry
     {
     public:
         AssetReferenceRegistry(std::filesystem::path projectRoot) : m_projectRoot(projectRoot) {}

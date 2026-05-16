@@ -32,6 +32,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(BUILD_WEB ON)
 endif()
 
+if(NOT BUILD_WEB)
+  option(NEXUS_BUILD_EDITOR "Build the Qt-based editor target" ON)
+else()
+  set(NEXUS_BUILD_EDITOR OFF)
+endif()
+
+option(NEXUS_EDITOR_MODE "Build NexusEngine for editor-hosted DLL mode" OFF)
+if(NOT BUILD_WEB AND NEXUS_BUILD_EDITOR)
+  set(NEXUS_EDITOR_MODE ON CACHE BOOL "Build NexusEngine for editor-hosted DLL mode" FORCE)
+endif()
+
 # ---------------- Diligent (extern) ----------------
 # Keep only the backend we use on each platform.
 if(BUILD_WEB)
@@ -85,16 +96,28 @@ add_subdirectory(extern/DiligentEngine)
 #endif()
 
 # ---- Flecs (ECS) ----
-# Flecs config (static lib, no tests/docs/tools)
-set(FLECS_STATIC   ON  CACHE BOOL "" FORCE)
-set(FLECS_SHARED   OFF CACHE BOOL "" FORCE)
+if(BUILD_WEB)
+  set(FLECS_STATIC ON CACHE BOOL "" FORCE)
+  set(FLECS_SHARED OFF CACHE BOOL "" FORCE)
+elseif(NEXUS_EDITOR_MODE)
+  set(FLECS_STATIC OFF CACHE BOOL "" FORCE)
+  set(FLECS_SHARED ON CACHE BOOL "" FORCE)
+else()
+  set(FLECS_STATIC ON CACHE BOOL "" FORCE)
+  set(FLECS_SHARED OFF CACHE BOOL "" FORCE)
+endif()
 set(FLECS_PIC      ON  CACHE BOOL "" FORCE)
 set(FLECS_TESTS    OFF CACHE BOOL "" FORCE)
 set(FLECS_DOCS     OFF CACHE BOOL "" FORCE)
 set(FLECS_SANITIZE OFF CACHE BOOL "" FORCE)
 set(FLECS_META     ON  CACHE BOOL "" FORCE)
 add_subdirectory(extern/flecs)
-set_target_properties(flecs_static PROPERTIES FOLDER "extern")
+if(TARGET flecs_static)
+  set_target_properties(flecs_static PROPERTIES FOLDER "extern")
+endif()
+if(TARGET flecs)
+  set_target_properties(flecs PROPERTIES FOLDER "extern")
+endif()
 
 if(BUILD_WEB)
   if(TARGET flecs_static)
@@ -187,12 +210,8 @@ prefix_folder_recursive("${CMAKE_CURRENT_SOURCE_DIR}/extern/DiligentEngine"  "ex
 # ---------------- Subprojects ----------------
 # ImGui/Flecs/SDL/Diligent are all available BEFORE NexusEngine,
 # so the engine can include <imgui.h> and link its backends.
-add_subdirectory(NexusEngine)   # STATIC lib (owns ImGui + bridge)
-add_subdirectory(SampleGame)    # STATIC lib
-add_subdirectory(GameRuntime)   # EXE
+add_subdirectory(NexusEngine)
 if(NOT BUILD_WEB)
-  option(NEXUS_BUILD_EDITOR "Build the Qt-based editor target" ON)
-
   if(NEXUS_BUILD_EDITOR)
     if(DEFINED Qt6_DIR AND MSVC AND NOT Qt6_DIR MATCHES "[\\/]msvc")
       message(WARNING "Ignoring incompatible Qt6_DIR='${Qt6_DIR}'. MSVC builds require a Qt6 msvc kit.")

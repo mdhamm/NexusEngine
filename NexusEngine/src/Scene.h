@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <flecs.h>
 
 #include <string>
@@ -9,7 +11,7 @@ namespace NexusEngine
     class Engine;
     class RenderResourceFactory;
 
-    struct Scene
+    struct NEXUS_ENGINE_API Scene
     {
         /// <summary>
         /// Creates a scene wrapper whose entities live under a root entity in the engine world.

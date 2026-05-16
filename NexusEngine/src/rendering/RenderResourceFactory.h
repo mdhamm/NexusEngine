@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/RenderDevice.h>
@@ -43,7 +45,7 @@ namespace NexusEngine
     };
 
     // Factory for creating shaders, materials, meshes, and cached pipelines.
-    class RenderResourceFactory
+    class NEXUS_ENGINE_API RenderResourceFactory
     {
     public:
         // Cached pipeline objects for a material/mesh/output combination.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <string>
 
 namespace NexusEngine
@@ -27,7 +29,7 @@ namespace NexusEngine::IO
         }
     };
 
-    void Serialize(const AssetReference& reference, ISerializeWriter& writer);
-    bool Deserialize(AssetReference& reference, ISerializeReader& reader);
+    NEXUS_ENGINE_API void Serialize(const AssetReference& reference, ISerializeWriter& writer);
+    NEXUS_ENGINE_API bool Deserialize(AssetReference& reference, ISerializeReader& reader);
 
 } // namespace NexusEngine::IO

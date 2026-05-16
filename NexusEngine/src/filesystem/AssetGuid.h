@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NexusEngineApi.h"
+
 #include <string>
 
 namespace NexusEngine::IO
@@ -8,5 +10,5 @@ namespace NexusEngine::IO
     /// Creates a new asset guid string.
     /// </summary>
     /// <returns>A newly generated asset guid.</returns>
-    std::string CreateAssetGuid();
+    NEXUS_ENGINE_API std::string CreateAssetGuid();
 } // namespace NexusEngine::IO

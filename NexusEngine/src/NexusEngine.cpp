@@ -1,5 +1,6 @@
 #include "NexusEngine.h"
 
+#include "EngineComponentRegistration.h"
 #include "ProjectSettings.h"
 #include "components/CameraComponent.h"
 #include "components/EditorOnlyComponent.h"
@@ -39,11 +40,7 @@ namespace NexusEngine
 
         void RegisterBuiltinComponents(flecs::world& world)
         {
-            static bool s_registered = false;
-            if (s_registered)
-            {
-                return;
-            }
+            RegisterEngineComponentTypes(world);
 
             MetadataRegistry& registry = MetadataRegistry::Instance();
             RegisterComponent<TransformComponent>(world, registry);
@@ -51,8 +48,6 @@ namespace NexusEngine
             RegisterComponent<RenderTextureComponent>(world, registry);
             RegisterComponent<RenderMeshComponent>(world, registry);
             RegisterComponent<FlyCameraComponent>(world, registry);
-
-            s_registered = true;
         }
 
         struct InstanceTransformData

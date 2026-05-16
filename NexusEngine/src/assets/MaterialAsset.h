@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NexusEngineApi.h"
 #include "filesystem/FileIO.h"
 
 #include <string>
@@ -19,11 +20,11 @@ namespace NexusEngine
         bool m_depthWriteEnabled = true;
     };
 
-    void Serialize(const MaterialAsset& materialAsset, ISerializeWriter& writer);
-    bool Deserialize(MaterialAsset& materialAsset, ISerializeReader& reader);
+    NEXUS_ENGINE_API void Serialize(const MaterialAsset& materialAsset, ISerializeWriter& writer);
+    NEXUS_ENGINE_API bool Deserialize(MaterialAsset& materialAsset, ISerializeReader& reader);
 
-    bool CreateEmptyMaterialAssetFile(const std::filesystem::path& filePath, std::string_view materialName);
-    bool LoadMaterialAssetFile(const std::filesystem::path& filePath, MaterialAsset& materialAsset);
-    bool SaveMaterialAssetFile(const std::filesystem::path& filePath, const MaterialAsset& materialAsset);
-    bool IsMaterialAssetFilePath(std::string_view filePath);
+    NEXUS_ENGINE_API bool CreateEmptyMaterialAssetFile(const std::filesystem::path& filePath, std::string_view materialName);
+    NEXUS_ENGINE_API bool LoadMaterialAssetFile(const std::filesystem::path& filePath, MaterialAsset& materialAsset);
+    NEXUS_ENGINE_API bool SaveMaterialAssetFile(const std::filesystem::path& filePath, const MaterialAsset& materialAsset);
+    NEXUS_ENGINE_API bool IsMaterialAssetFilePath(std::string_view filePath);
 } // namespace NexusEngine
