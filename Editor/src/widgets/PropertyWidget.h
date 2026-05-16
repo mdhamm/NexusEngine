@@ -23,6 +23,7 @@ namespace NexusEditor
 {
     class EditorWindow;
     class PropertyWidgetSerializer;
+    struct InspectedTarget;
 
     class PropertyWidget final : public QWidget
     {
@@ -33,18 +34,6 @@ namespace NexusEditor
         /// <param name="editorWindow">Editor window that owns the engine instance.</param>
         /// <param name="parent">Optional parent widget.</param>
         explicit PropertyWidget(EditorWindow& editorWindow, QWidget* parent = nullptr);
-
-        /// <summary>
-        /// Sets the selected entity to inspect.
-        /// </summary>
-        /// <param name="entityId">Selected entity identifier.</param>
-        void SetSelectedEntityId(std::uint64_t entityId);
-
-        /// <summary>
-        /// Sets the selected asset to inspect.
-        /// </summary>
-        /// <param name="assetPath">Selected asset path.</param>
-        void SetSelectedAssetPath(const QString& assetPath);
 
         /// <summary>
         /// Refreshes the property inspector contents.
@@ -93,6 +82,7 @@ namespace NexusEditor
         };
 
         QString CaptureStructureSignature() const;
+        void HandleInspectedTargetChanged(const InspectedTarget& inspectedTarget);
         void SyncDisplayedValues();
         void RebuildAssetContents();
         void RebuildContents();

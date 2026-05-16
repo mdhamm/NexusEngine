@@ -10,6 +10,8 @@
 #include <QMainWindow>
 
 #include <string>
+#include <functional>
+#include <vector>
 
 namespace NexusEngine
 {
@@ -17,6 +19,7 @@ namespace NexusEngine
 }
 
 #include "EditorProject.h"
+#include "InspectedTarget.h"
 #include "QtInputBackend.h"
 
 namespace NexusEditor
@@ -98,12 +101,25 @@ namespace NexusEditor
         /// <returns>The absolute project root path.</returns>
         const QString& GetProjectRootPath() const { return m_project.m_rootPath; }
 
+        /// <summary>
+        /// Returns the currently inspected editor target.
+        /// </summary>
+        /// <returns>The current inspected target.</returns>
+        const InspectedTarget& GetInspectedTarget() const { return m_inspectedTarget; }
+
+        /// <summary>
+        /// Registers a listener that is invoked whenever the inspected target changes.
+        /// </summary>
+        /// <param name="listener">Callback receiving the new inspected target.</param>
+        void AddInspectedTargetChangedListener(std::function<void(const InspectedTarget&)> listener);
+
     private:
         void BuildMenus();
         void BuildLayout();
         void ResolveMaterialAssets();
         void SetSceneMode(bool isSceneMode);
         void ConfigureEditorCamera();
+        void SetInspectedTarget(const InspectedTarget& inspectedTarget);
         QString ResolveSceneFilePath() const;
         std::string CaptureActiveSceneSnapshot() const;
         bool IsCurrentSceneDirty() const;
@@ -121,6 +137,8 @@ namespace NexusEditor
         bool m_isSceneMode = true;
         bool m_hasLoadedScene = false;
         std::string m_lastSavedSceneSnapshot;
+        InspectedTarget m_inspectedTarget;
+        std::vector<std::function<void(const InspectedTarget&)>> m_inspectedTargetChangedListeners;
 
         struct MaterialAssetCacheEntry
         {

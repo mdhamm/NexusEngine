@@ -67,6 +67,8 @@ else()
   )
 endif()
 
+add_executable(Editor ${GAME_MAIN})
+
 target_link_libraries(Editor PRIVATE SampleGame)
 
 target_include_directories(Editor PUBLIC

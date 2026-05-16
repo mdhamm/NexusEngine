@@ -1,12 +1,14 @@
 #include "SceneGraphWidget.h"
 
 #include "EditorWindow.h"
+#include "InspectedTarget.h"
 
 #include <Scene.h>
 #include <components/EditorOnlyComponent.h>
 #include <components/TransformComponent.h>
 
 #include <QHeaderView>
+#include <QSignalBlocker>
 #include <QMenu>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -41,6 +43,15 @@ namespace NexusEditor
     {
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
+
+        if (m_editorWindow)
+        {
+            m_editorWindow->AddInspectedTargetChangedListener(
+                [this](const InspectedTarget& inspectedTarget)
+                {
+                    HandleInspectedTargetChanged(inspectedTarget);
+                });
+        }
 
         auto* buttonLayout = new QHBoxLayout();
         auto* addEntityButton = new QPushButton(QStringLiteral("Add Entity"), this);
@@ -226,9 +237,40 @@ namespace NexusEditor
         m_onSelectionChanged = std::move(callback);
     }
 
-    void SceneGraphWidget::SetEntityDeletedCallback(std::function<void(std::uint64_t)> callback)
+    void SceneGraphWidget::HandleInspectedTargetChanged(const InspectedTarget& inspectedTarget)
     {
-        m_onEntityDeleted = std::move(callback);
+        if (!m_treeWidget)
+        {
+            return;
+        }
+
+        const EntityInspectedTarget* entityTarget = std::get_if<EntityInspectedTarget>(&inspectedTarget.m_value);
+        if (!entityTarget)
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (m_selectedEntityId == entityTarget->m_entityId)
+        {
+            return;
+        }
+
+        m_selectedEntityId = entityTarget->m_entityId;
+        Refresh();
+    }
+
+    void SceneGraphWidget::ClearSelection()
+    {
+        m_selectedEntityId = 0;
+        if (!m_treeWidget)
+        {
+            return;
+        }
+
+        const QSignalBlocker blocker(m_treeWidget);
+        m_treeWidget->setCurrentItem(nullptr);
+        m_treeWidget->clearSelection();
     }
 
     void SceneGraphWidget::DeleteSelectedEntity()
@@ -258,11 +300,6 @@ namespace NexusEditor
         if (m_onSelectionChanged)
         {
             m_onSelectionChanged(0);
-        }
-
-        if (m_onEntityDeleted)
-        {
-            m_onEntityDeleted(deletedEntityId);
         }
     }
 } // namespace NexusEditor

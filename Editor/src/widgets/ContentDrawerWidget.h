@@ -16,15 +16,19 @@ class QWidget;
 
 namespace NexusEditor
 {
+    class EditorWindow;
+    struct InspectedTarget;
+
     class ContentDrawerWidget final : public QWidget
     {
     public:
         /// <summary>
         /// Creates the content drawer rooted at the supplied project directory.
         /// </summary>
+        /// <param name="editorWindow">Editor window that owns the shared inspected target.</param>
         /// <param name="contentRootPath">Absolute project content root.</param>
         /// <param name="parent">Optional parent widget.</param>
-        explicit ContentDrawerWidget(const QString& contentRootPath, QWidget* parent = nullptr);
+        explicit ContentDrawerWidget(EditorWindow& editorWindow, const QString& contentRootPath, QWidget* parent = nullptr);
 
         /// <summary>
         /// Sets the callback invoked when a scene asset is opened from the content drawer.
@@ -50,7 +54,13 @@ namespace NexusEditor
         /// <param name="callback">Callback receiving the absolute asset path or folder path being deleted.</param>
         void SetAssetDeletedCallback(std::function<void(const QString&)> callback);
 
+        /// <summary>
+        /// Clears the current content selection without changing editor-owned inspector state.
+        /// </summary>
+        void ClearSelection();
+
     private:
+        void HandleInspectedTargetChanged(const InspectedTarget& inspectedTarget);
         void SetCurrentFolder(const QString& folderPath);
         void RebuildBreadcrumbs(const QString& folderPath);
         void ShowFolderContextMenu(const QPoint& position);
@@ -69,6 +79,7 @@ namespace NexusEditor
         bool IsSceneIndex(const QModelIndex& index) const;
         QModelIndex ToSourceIndex(const QModelIndex& index) const;
 
+        EditorWindow* m_editorWindow = nullptr;
         QString m_contentRootPath;
         QFileSystemModel* m_folderModel = nullptr;
         QFileSystemModel* m_contentModel = nullptr;

@@ -1,6 +1,8 @@
 #include "ContentDrawerWidget.h"
 
+#include "EditorWindow.h"
 #include "EditorSceneSerializer.h"
+#include "InspectedTarget.h"
 
 #include <assets/MaterialAsset.h>
 #include <filesystem/AssetReferenceRegistry.h>
@@ -232,10 +234,20 @@ namespace NexusEditor
         };
     }
 
-    ContentDrawerWidget::ContentDrawerWidget(const QString& contentRootPath, QWidget* parent)
+    ContentDrawerWidget::ContentDrawerWidget(EditorWindow& editorWindow, const QString& contentRootPath, QWidget* parent)
         : QWidget(parent)
+        , m_editorWindow(&editorWindow)
         , m_contentRootPath(QDir::cleanPath(contentRootPath))
     {
+        if (m_editorWindow)
+        {
+            m_editorWindow->AddInspectedTargetChangedListener(
+                [this](const InspectedTarget& inspectedTarget)
+                {
+                    HandleInspectedTargetChanged(inspectedTarget);
+                });
+        }
+
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
@@ -444,6 +456,24 @@ namespace NexusEditor
     void ContentDrawerWidget::SetAssetDeletedCallback(std::function<void(const QString&)> callback)
     {
         m_onAssetDeleted = std::move(callback);
+    }
+
+    void ContentDrawerWidget::ClearSelection()
+    {
+        if (m_contentListView && m_contentListView->selectionModel())
+        {
+            m_contentListView->selectionModel()->clearSelection();
+        }
+    }
+
+    void ContentDrawerWidget::HandleInspectedTargetChanged(const InspectedTarget& inspectedTarget)
+    {
+        if (std::holds_alternative<AssetInspectedTarget>(inspectedTarget.m_value))
+        {
+            return;
+        }
+
+        ClearSelection();
     }
 
     void ContentDrawerWidget::SetCurrentFolder(const QString& folderPath)

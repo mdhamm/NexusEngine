@@ -155,6 +155,17 @@ namespace NexusEditor
         return m_inputBackend;
     }
 
+    void EditorWindow::AddInspectedTargetChangedListener(std::function<void(const InspectedTarget&)> listener)
+    {
+        if (!listener)
+        {
+            return;
+        }
+
+        m_inspectedTargetChangedListeners.push_back(std::move(listener));
+        m_inspectedTargetChangedListeners.back()(m_inspectedTarget);
+    }
+
     void EditorWindow::ResizeSceneViewport(int width, int height)
     {
         m_engine.ResizeOutput(width, height);
@@ -258,24 +269,19 @@ namespace NexusEditor
         m_sceneGraph->SetSelectionChangedCallback(
             [this](std::uint64_t entityId)
             {
-                if (m_propertyWidget)
+                InspectedTarget inspectedTarget;
+                if (entityId != 0)
                 {
-                    m_propertyWidget->SetSelectedEntityId(entityId);
+                    inspectedTarget.m_value = EntityInspectedTarget{ entityId };
                 }
-            });
-        m_sceneGraph->SetEntityDeletedCallback(
-            [this](std::uint64_t entityId)
-            {
-                if (m_propertyWidget)
-                {
-                    m_propertyWidget->NotifyEntityDeleted(entityId);
-                }
+
+                SetInspectedTarget(inspectedTarget);
             });
 
         // Content Drawer
         auto* contentDrawerDock = new QDockWidget(QStringLiteral("Content Drawer"), this);
         contentDrawerDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
-        m_contentDrawer = new ContentDrawerWidget(m_project.m_rootPath, contentDrawerDock);
+        m_contentDrawer = new ContentDrawerWidget(*this, m_project.m_rootPath, contentDrawerDock);
         m_contentDrawer->SetSceneOpenedCallback(
             [this](const QString& sceneFilePath)
             {
@@ -334,9 +340,10 @@ namespace NexusEditor
 
                 if (m_propertyWidget)
                 {
-                    m_propertyWidget->SetSelectedEntityId(0);
                     m_propertyWidget->Refresh();
                 }
+
+                SetInspectedTarget(InspectedTarget{});
 
                 statusBar()->showMessage(QStringLiteral("Loaded scene %1").arg(sceneFilePath), 3000);
             });
@@ -349,9 +356,16 @@ namespace NexusEditor
                     {
                         return;
                     }
-
-                    m_propertyWidget->SetSelectedAssetPath(assetPath);
                 }
+
+                InspectedTarget inspectedTarget;
+                const QString cleanAssetPath = assetPath.trimmed();
+                if (!cleanAssetPath.isEmpty())
+                {
+                    inspectedTarget.m_value = AssetInspectedTarget{ cleanAssetPath };
+                }
+
+                SetInspectedTarget(inspectedTarget);
             });
         m_contentDrawer->SetAssetRenamedCallback(
             [this](const QString& oldPath, const QString& newPath)
@@ -475,6 +489,23 @@ namespace NexusEditor
 
                 renderMesh.material = cacheEntry.m_material.get();
             });
+    }
+
+    void EditorWindow::SetInspectedTarget(const InspectedTarget& inspectedTarget)
+    {
+        if (m_inspectedTarget.m_value == inspectedTarget.m_value)
+        {
+            return;
+        }
+
+        m_inspectedTarget = inspectedTarget;
+        for (const std::function<void(const InspectedTarget&)>& listener : m_inspectedTargetChangedListeners)
+        {
+            if (listener)
+            {
+                listener(m_inspectedTarget);
+            }
+        }
     }
 
     void EditorWindow::InitializeEngine()

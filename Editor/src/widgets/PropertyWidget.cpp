@@ -1,6 +1,7 @@
 #include "PropertyWidget.h"
 
 #include "EditorSceneSerializer.h"
+#include "InspectedTarget.h"
 #include "EditorWindow.h"
 #include "PropertyWidgetSerializer.h"
 
@@ -76,6 +77,15 @@ namespace NexusEditor
     {
         auto* rootLayout = new QVBoxLayout(this);
         rootLayout->setContentsMargins(0, 0, 0, 0);
+
+        if (m_editorWindow)
+        {
+            m_editorWindow->AddInspectedTargetChangedListener(
+                [this](const InspectedTarget& inspectedTarget)
+                {
+                    HandleInspectedTargetChanged(inspectedTarget);
+                });
+        }
 
         auto* addComponentLayout = new QHBoxLayout();
         m_addComponentComboBox = new QComboBox(this);
@@ -168,47 +178,6 @@ namespace NexusEditor
         ClearAssetReferencePick();
         SyncDisplayedValues();
         return true;
-    }
-
-    void PropertyWidget::NotifyEntityDeleted(std::uint64_t entityId)
-    {
-        if (m_selectedEntityId != entityId)
-        {
-            return;
-        }
-
-        m_selectedEntityId = 0;
-        Refresh();
-    }
-
-    void PropertyWidget::SetSelectedEntityId(std::uint64_t entityId)
-    {
-        m_selectedAssetPath.clear();
-        if (m_selectedEntityId == entityId)
-        {
-            return;
-        }
-
-        m_selectedEntityId = entityId;
-        Refresh();
-    }
-
-    void PropertyWidget::SetSelectedAssetPath(const QString& assetPath)
-    {
-        const QString cleanAssetPath = assetPath.trimmed();
-        if (m_selectedAssetPath == cleanAssetPath)
-        {
-            return;
-        }
-
-        if (TryAssignPickedAssetPath(cleanAssetPath))
-        {
-            return;
-        }
-
-        m_selectedAssetPath = cleanAssetPath;
-        m_selectedEntityId = 0;
-        Refresh();
     }
 
     void PropertyWidget::Refresh()
@@ -331,6 +300,50 @@ namespace NexusEditor
         }
 
         return signature;
+    }
+
+    void PropertyWidget::HandleInspectedTargetChanged(const InspectedTarget& inspectedTarget)
+    {
+        if (const EntityInspectedTarget* entityTarget = std::get_if<EntityInspectedTarget>(&inspectedTarget.m_value))
+        {
+            m_selectedAssetPath.clear();
+            if (m_selectedEntityId == entityTarget->m_entityId)
+            {
+                return;
+            }
+
+            m_selectedEntityId = entityTarget->m_entityId;
+            Refresh();
+            return;
+        }
+
+        if (const AssetInspectedTarget* assetTarget = std::get_if<AssetInspectedTarget>(&inspectedTarget.m_value))
+        {
+            const QString cleanAssetPath = assetTarget->m_assetPath.trimmed();
+            if (m_selectedAssetPath == cleanAssetPath)
+            {
+                return;
+            }
+
+            if (TryAssignPickedAssetPath(cleanAssetPath))
+            {
+                return;
+            }
+
+            m_selectedAssetPath = cleanAssetPath;
+            m_selectedEntityId = 0;
+            Refresh();
+            return;
+        }
+
+        if (m_selectedEntityId == 0 && m_selectedAssetPath.isEmpty())
+        {
+            return;
+        }
+
+        m_selectedEntityId = 0;
+        m_selectedAssetPath.clear();
+        Refresh();
     }
 
     QStringList PropertyWidget::GetAssetPathsForType(NexusEngine::AssetType assetType) const
