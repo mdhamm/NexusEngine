@@ -27,4 +27,9 @@ namespace NexusEngine
 
         return nullptr;
     }
+
+    void MetadataRegistry::Remove(TypeId type)
+    {
+        m_components.erase(type);
+    }
 } // namespace NexusEngine

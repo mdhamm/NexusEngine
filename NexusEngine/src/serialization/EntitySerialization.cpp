@@ -52,18 +52,23 @@ namespace NexusEngine
 
     void SerializeEntity(const flecs::entity& entity, ISerializeWriter& writer)
     {
+        SerializeEntity(entity, {}, writer);
+    }
+
+    void SerializeEntity(const flecs::entity& entity, const flecs::entity& sceneRoot, ISerializeWriter& writer)
+    {
         writer.Write("id", static_cast<std::uint64_t>(entity.id()));
         writer.Write("name", entity.name() ? std::string_view(entity.name()) : std::string_view{});
 
         const flecs::entity parent = entity.parent();
+        const bool parentIsSceneRoot = sceneRoot.is_valid() && parent == sceneRoot;
         writer.Write(
             "parentId",
-            parent.is_valid()
+            (parent.is_valid() && !parentIsSceneRoot)
                 ? static_cast<std::uint64_t>(parent.id())
                 : static_cast<std::uint64_t>(0));
 
         writer.BeginArray("components");
-
         for (const auto& [type, metadata] : MetadataRegistry::Instance().GetAll())
         {
             (void)type;
@@ -76,7 +81,6 @@ namespace NexusEngine
             SerializeComponent(metadata, entity, writer);
             writer.EndArrayElement();
         }
-
         writer.EndArray();
     }
 
@@ -129,14 +133,12 @@ namespace NexusEngine
         for (std::size_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
         {
             reader.BeginArrayElement(fieldIndex);
-
             std::string fieldName;
             std::string fieldValue;
             if (DeserializeField(fieldName, fieldValue, reader))
             {
                 (void)WriteFieldText(*metadata, entity, fieldName, fieldValue);
             }
-
             reader.EndArrayElement();
         }
         reader.EndArray();

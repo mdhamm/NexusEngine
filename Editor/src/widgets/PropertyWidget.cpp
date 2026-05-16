@@ -118,8 +118,8 @@ namespace NexusEditor
                 }
 
                 const std::string componentName = selectedName.toString().toStdString();
-                const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-                if (!entity.is_valid())
+                const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+                if (!entity.is_valid() || !activeScene->ContainsEntity(entity))
                 {
                     return;
                 }
@@ -158,8 +158,8 @@ namespace NexusEditor
             return false;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return false;
         }
@@ -248,8 +248,8 @@ namespace NexusEditor
             return QStringLiteral("state:no-selection");
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return QStringLiteral("state:invalid-selection");
         }
@@ -504,8 +504,8 @@ namespace NexusEditor
             return;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return;
         }
@@ -630,8 +630,8 @@ namespace NexusEditor
             return;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return;
         }
@@ -704,8 +704,8 @@ namespace NexusEditor
             return;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             m_selectedEntityId = 0;
             m_contentLayout->addWidget(new QLabel(QStringLiteral("Select an entity to inspect"), this));
@@ -788,8 +788,8 @@ namespace NexusEditor
             return;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return;
         }

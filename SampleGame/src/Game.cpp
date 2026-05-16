@@ -99,172 +99,152 @@ namespace SampleGame
 
     namespace
     {
-        void RegisterComponentMetadata(flecs::world& world)
+        std::vector<flecs::entity> BuildSystems(NexusEngine::Engine& engine)
         {
-            static bool s_registered = false;
-            if (s_registered)
-            {
-                return;
-            }
-
-            NexusEngine::RegisterComponent<RotationSpeed>(world, NexusEngine::MetadataRegistry::Instance());
-
-            s_registered = true;
-        }
-    }
-
-    class Game final : public NexusEngine::IGameApp
-    {
-    public:
-        void OnStartup(NexusEngine::Engine& engine) override
-        {
-            auto& scene = engine.CreateScene("MainScene");
-            engine.SetActiveScene("MainScene");
-            auto& w = scene.m_world;
-            RegisterComponentMetadata(w);
-
-#if !defined(__EMSCRIPTEN__)
-            SDL_SetRelativeMouseMode(SDL_TRUE);
-#endif
-
-            // Create a default camera
-            auto camera = w.entity("MainCamera")
-                .set(NexusEngine::CameraComponent{})
-                .set(NexusEngine::TransformComponent::FromLocal(
-                    Diligent::float3(0.0f, 0.0f, 18.0f),
-                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
-                    Diligent::float3(1.0f, 1.0f, 1.0f)))
-                .set(NexusEngine::FlyCameraComponent{});
-
-            // Create rendering resources using the factory
-            auto* factory = scene.GetResourceFactory();
-            if (factory)
-            {
-                // Create shared resources
-                // TODO: we are leaking these. Also why are we creating a material in the game??
-                NexusEngine::Mesh* cubeMesh = factory->CreateCubeMesh();
-                NexusEngine::Material* unlitMaterial = factory->CreateUnlitMaterial();
-
-                if (cubeMesh && unlitMaterial)
-                {
-                    constexpr int CubeCountX = 100;
-                    constexpr int CubeCountZ = 100;
-                    constexpr float Spacing = 1.0f;
-                    constexpr float NoiseFrequency = 0.045f;
-                    constexpr float HeightScale = 6.0f;
-                    constexpr float BaseScale = 1.0f;
-
-                    for (int z = 0; z < CubeCountZ; ++z)
-                    {
-                        for (int x = 0; x < CubeCountX; ++x)
-                        {
-                            const float sampleX = static_cast<float>(x) * NoiseFrequency;
-                            const float sampleZ = static_cast<float>(z) * NoiseFrequency;
-                            const float noise = PerlinNoise2D(sampleX, sampleZ);
-                            const float height = noise * HeightScale;
-                            const float heightScaleBias = noise > 0.0f ? noise * 0.15f : 0.0f;
-
-                            // Get a random rotation speed
-                            const float MAX_SPEED = 1.0f;
-                            float rx = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
-                            float ry = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
-                            float rz = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / MAX_SPEED);
-
-                            auto noiseCube = w.entity()
-                                .set(NexusEngine::TransformComponent::FromLocal(
-                                    Diligent::float3(
-                                        (static_cast<float>(x) - static_cast<float>(CubeCountX) * 0.5f) * Spacing,
-                                        height,
-                                        (static_cast<float>(z) - static_cast<float>(CubeCountZ) * 0.5f) * Spacing),
-                                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
-                                    Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)))
-                                .set(NexusEngine::RenderMeshComponent{})
-                                .set(RotationSpeed{ rx, ry, rz });
-
-                            auto* noiseRenderMesh = noiseCube.get_mut<NexusEngine::RenderMeshComponent>();
-                            noiseRenderMesh->mesh = cubeMesh;
-                            noiseRenderMesh->material = unlitMaterial;
-                            noiseRenderMesh->visible = true;
-                        }
-                    }
-
-                    auto parentCube = w.entity("ParentCube")
-                        .set(NexusEngine::TransformComponent::FromLocal(
-                            Diligent::float3(0.0f, 5.0f, 0.0f),
-                            NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
-                            Diligent::float3(1.0f, 1.0f, 1.0f)))
-                        .set(NexusEngine::RenderMeshComponent{})
-                        .set(RotationSpeed{ 0.35f, 0.7f, 0.0f });
-
-                    auto* parentRenderMesh = parentCube.get_mut<NexusEngine::RenderMeshComponent>();
-                    parentRenderMesh->mesh = cubeMesh;
-                    parentRenderMesh->material = unlitMaterial;
-                    parentRenderMesh->visible = true;
-
-                    // Create rotating cube entity as a child of the parent cube
-                    auto cube = w.entity("RotatingCube")
-                        .child_of(parentCube)
-                        .set(NexusEngine::TransformComponent::FromLocal(
-                            Diligent::float3(1.0f, 0.0f, 0.0f),
-                            NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
-                            Diligent::float3(0.3f, 0.3f, 0.3f)))
-                        .set(NexusEngine::RenderMeshComponent{})
-                        .set(RotationSpeed{ 0.0f, 1.0f, 0.5f });
-
-                    auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();
-                    renderMesh->mesh = cubeMesh;
-                    renderMesh->material = unlitMaterial;
-                    renderMesh->visible = true;
-                }
-            }
-
-            RegisterSystems(scene);
-        }
-
-        void OnShutdown(NexusEngine::Engine&) override
-        {
-        }
-
-    private:
-        void RegisterSystems(NexusEngine::Scene& scene)
-        {
-            flecs::world& w = scene.m_world;
+            std::vector<flecs::entity> systems;
+            flecs::world& w = engine.GetWorld();
+            NexusEngine::RenderResourceFactory* factory = engine.GetResourceFactory();
 
 #if defined(__EMSCRIPTEN__)
-            // Static variables for accumulated mouse movement on web
             static int s_accumulatedMouseX = 0;
             static int s_accumulatedMouseY = 0;
             static bool s_pointerLockRequested = false;
 
-            // Set up mouse move callback for pointer lock mode
             emscripten_set_mousemove_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, true,
-                [](int, const EmscriptenMouseEvent* e, void*) -> EM_BOOL {
+                [](int, const EmscriptenMouseEvent* e, void*) -> EM_BOOL
+                {
                     s_accumulatedMouseX += e->movementX;
                     s_accumulatedMouseY += e->movementY;
                     return EM_TRUE;
                 });
 
-            // Request pointer lock on click
             emscripten_set_click_callback("#canvas", nullptr, true,
-                [](int, const EmscriptenMouseEvent*, void*) -> EM_BOOL {
+                [](int, const EmscriptenMouseEvent*, void*) -> EM_BOOL
+                {
                     if (!s_pointerLockRequested)
                     {
                         emscripten_request_pointerlock("#canvas", true);
                         s_pointerLockRequested = true;
                     }
+
                     return EM_TRUE;
                 });
 
-            // Track pointer lock state
             emscripten_set_pointerlockchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, true,
-                [](int, const EmscriptenPointerlockChangeEvent* e, void*) -> EM_BOOL {
+                [](int, const EmscriptenPointerlockChangeEvent* e, void*) -> EM_BOOL
+                {
                     s_pointerLockRequested = e->isActive;
                     return EM_TRUE;
                 });
 #endif
 
-            // System to rotate objects with RotationSpeed component
-            w.system<NexusEngine::TransformComponent, RotationSpeed>("RotateObjects")
+#if !defined(__EMSCRIPTEN__)
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+#endif
+
+            flecs::entity initializeWorldSystem = w.system<World>("InitializeWorld")
+                .kind<NexusEngine::GameplayPhase>()
+                .term<NexusEngine::GameplayEnabled>()
+                .term<WorldInitialized>().oper(flecs::Not)
+                .iter(
+                    [factory](flecs::iter& it, World*)
+                    {
+                        if (!factory)
+                        {
+                            return;
+                        }
+
+                        NexusEngine::Mesh* cubeMesh = factory->CreateCubeMesh();
+                        NexusEngine::Material* unlitMaterial = factory->CreateUnlitMaterial();
+                        if (!cubeMesh || !unlitMaterial)
+                        {
+                            return;
+                        }
+
+                        for (auto i : it)
+                        {
+                            flecs::entity worldEntity = it.entity(i);
+                            worldEntity.add<WorldInitialized>();
+
+                            auto camera = it.world().entity("MainCamera")
+                                .set(NexusEngine::CameraComponent{})
+                                .set(NexusEngine::TransformComponent::FromLocal(
+                                    Diligent::float3(0.0f, 0.0f, 18.0f),
+                                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                                    Diligent::float3(1.0f, 1.0f, 1.0f)))
+                                .set(NexusEngine::FlyCameraComponent{});
+                            (void)camera;
+
+                            constexpr int CubeCountX = 100;
+                            constexpr int CubeCountZ = 100;
+                            constexpr float Spacing = 1.0f;
+                            constexpr float NoiseFrequency = 0.045f;
+                            constexpr float HeightScale = 6.0f;
+                            constexpr float BaseScale = 1.0f;
+
+                            for (int z = 0; z < CubeCountZ; ++z)
+                            {
+                                for (int x = 0; x < CubeCountX; ++x)
+                                {
+                                    const float sampleX = static_cast<float>(x) * NoiseFrequency;
+                                    const float sampleZ = static_cast<float>(z) * NoiseFrequency;
+                                    const float noise = PerlinNoise2D(sampleX, sampleZ);
+                                    const float height = noise * HeightScale;
+                                    const float heightScaleBias = noise > 0.0f ? noise * 0.15f : 0.0f;
+
+                                    const float maxSpeed = 1.0f;
+                                    const float rx = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / maxSpeed);
+                                    const float ry = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / maxSpeed);
+                                    const float rz = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX / maxSpeed);
+
+                                    auto noiseCube = it.world().entity()
+                                        .set(NexusEngine::TransformComponent::FromLocal(
+                                            Diligent::float3(
+                                                (static_cast<float>(x) - static_cast<float>(CubeCountX) * 0.5f) * Spacing,
+                                                height,
+                                                (static_cast<float>(z) - static_cast<float>(CubeCountZ) * 0.5f) * Spacing),
+                                            NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                                            Diligent::float3(BaseScale, BaseScale + heightScaleBias, BaseScale)))
+                                        .set(NexusEngine::RenderMeshComponent{})
+                                        .set(RotationSpeed{ rx, ry, rz });
+
+                                    auto* noiseRenderMesh = noiseCube.get_mut<NexusEngine::RenderMeshComponent>();
+                                    noiseRenderMesh->mesh = cubeMesh;
+                                    noiseRenderMesh->material = unlitMaterial;
+                                    noiseRenderMesh->visible = true;
+                                }
+                            }
+
+                            auto parentCube = it.world().entity("ParentCube")
+                                .set(NexusEngine::TransformComponent::FromLocal(
+                                    Diligent::float3(0.0f, 5.0f, 0.0f),
+                                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                                    Diligent::float3(1.0f, 1.0f, 1.0f)))
+                                .set(NexusEngine::RenderMeshComponent{})
+                                .set(RotationSpeed{ 0.35f, 0.7f, 0.0f });
+
+                            auto* parentRenderMesh = parentCube.get_mut<NexusEngine::RenderMeshComponent>();
+                            parentRenderMesh->mesh = cubeMesh;
+                            parentRenderMesh->material = unlitMaterial;
+                            parentRenderMesh->visible = true;
+
+                            auto cube = it.world().entity("RotatingCube")
+                                .child_of(parentCube)
+                                .set(NexusEngine::TransformComponent::FromLocal(
+                                    Diligent::float3(1.0f, 0.0f, 0.0f),
+                                    NexusEngine::Quaternion::FromEuler(0.0f, 0.0f, 0.0f),
+                                    Diligent::float3(0.3f, 0.3f, 0.3f)))
+                                .set(NexusEngine::RenderMeshComponent{})
+                                .set(RotationSpeed{ 0.0f, 1.0f, 0.5f });
+
+                            auto* renderMesh = cube.get_mut<NexusEngine::RenderMeshComponent>();
+                            renderMesh->mesh = cubeMesh;
+                            renderMesh->material = unlitMaterial;
+                            renderMesh->visible = true;
+                        }
+                    });
+
+            flecs::entity rotateObjectsSystem = w.system<NexusEngine::TransformComponent, RotationSpeed>("RotateObjects")
                 .kind<NexusEngine::GameplayPhase>()
                 .term<NexusEngine::GameplayEnabled>()
                 .iter(
@@ -277,28 +257,18 @@ namespace SampleGame
                             auto& transform = transforms[i];
                             const auto& speed = speeds[i];
 
-                            // Current rotation (quaternion)
                             auto localRotation = transform.GetLocalRotation();
-
-                            // Build delta rotation from angular velocity (radians/sec * dt)
                             const float pitch = speed.m_x * dt;
                             const float yaw = speed.m_y * dt;
                             const float roll = speed.m_z * dt;
-
-                            const auto deltaRotation =
-                                NexusEngine::Quaternion::FromEuler(pitch, yaw, roll);
-
-                            // Apply rotation (order matters!)
+                            const auto deltaRotation = NexusEngine::Quaternion::FromEuler(pitch, yaw, roll);
                             localRotation = NexusEngine::Quaternion::Multiply(localRotation, deltaRotation);
-
-                            // Normalize to avoid drift
                             localRotation = NexusEngine::Quaternion::Normalize(localRotation);
-
                             NexusEngine::SetLocalRotation(entity, localRotation);
                         }
                     });
 
-            w.system<>("PrintFps")
+            flecs::entity printFpsSystem = w.system<>("PrintFps")
                 .kind<NexusEngine::GameplayPhase>()
                 .term<NexusEngine::GameplayEnabled>()
                 .iter(
@@ -320,8 +290,52 @@ namespace SampleGame
                             s_accumulatedFrames = 0;
                         }
                     });
+
+            systems.push_back(initializeWorldSystem);
+            systems.push_back(rotateObjectsSystem);
+            systems.push_back(printFpsSystem);
+            return systems;
+        }
+    }
+
+    class Game final : public NexusEngine::IGameApp
+    {
+    public:
+        void RegisterComponentMetadata(flecs::world& world, NexusEngine::MetadataRegistry& metadataRegistry) override
+        {
+            NexusEngine::RegisterComponent<RotationSpeed>(world, metadataRegistry);
+            NexusEngine::RegisterComponent<World>(world, metadataRegistry);
+            NexusEngine::RegisterComponent<WorldInitialized>(world, metadataRegistry);
+        }
+
+        void UnregisterComponentMetadata(NexusEngine::MetadataRegistry& metadataRegistry) override
+        {
+            NexusEngine::UnregisterComponent<RotationSpeed>(metadataRegistry);
+            NexusEngine::UnregisterComponent<World>(metadataRegistry);
+            NexusEngine::UnregisterComponent<WorldInitialized>(metadataRegistry);
+        }
+
+        std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine) override
+        {
+            return BuildSystems(engine);
+        }
+
+
+        void OnStartup(NexusEngine::Engine& engine) override
+        {
+            REF(engine);
+        }
+
+        void OnShutdown(NexusEngine::Engine& engine) override
+        {
+            REF(engine);
         }
     };
+
+    std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine)
+    {
+        return BuildSystems(engine);
+    }
 
     std::unique_ptr<NexusEngine::IGameApp> CreateGame()
     {
@@ -330,6 +344,10 @@ namespace SampleGame
 
     void RegisterEditorComponentDescriptors()
     {
-        // Sample game metadata registration now happens per-world during startup.
+        flecs::world world;
+        NexusEngine::MetadataRegistry& metadataRegistry = NexusEngine::MetadataRegistry::Instance();
+        NexusEngine::RegisterComponent<RotationSpeed>(world, metadataRegistry);
+        NexusEngine::RegisterComponent<World>(world, metadataRegistry);
+        NexusEngine::RegisterComponent<WorldInitialized>(world, metadataRegistry);
     }
 } // namespace SampleGame

@@ -26,6 +26,8 @@ namespace NexusEngine
 
     void SerializeEntity(const flecs::entity& entity, ISerializeWriter& writer);
 
+    void SerializeEntity(const flecs::entity& entity, const flecs::entity& sceneRoot, ISerializeWriter& writer);
+
     bool DeserializeField(std::string& fieldName, std::string& fieldValue, ISerializeReader& reader);
 
     bool DeserializeEntityHeader(SerializedEntityHeader& header, ISerializeReader& reader);

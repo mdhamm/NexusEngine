@@ -1,6 +1,8 @@
 #include "EditorProjectRegistry.h"
 
 #include <ProjectSettings.h>
+#include <filesystem/FileIO.h>
+#include <serialization/ProjectSettingsSerialization.h>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -70,6 +72,18 @@ namespace NexusEditor
 
             if (!project.m_rootPath.isEmpty() && QFileInfo::exists(project.m_rootPath))
             {
+                NexusEngine::ProjectSettings projectSettings;
+                const QString projectFilePath = GetProjectFilePath(project.m_rootPath);
+                if (NexusEngine::IO::LoadFromFile(projectSettings, std::filesystem::path(projectFilePath.toStdWString()), NexusEngine::IO::FileFormat::Json))
+                {
+                    if (!projectSettings.m_name.empty())
+                    {
+                        project.m_name = QString::fromStdString(projectSettings.m_name);
+                    }
+
+                    project.m_defaultScene = projectSettings.m_defaultScene;
+                }
+
                 projects.push_back(project);
             }
         }
@@ -96,6 +110,12 @@ namespace NexusEditor
         NexusEngine::ProjectSettings projectSettings{};
         projectSettings.m_name = project.m_name.toStdString();
         projectSettings.m_defaultScene = NexusEngine::IO::AssetReference{}; // No default scene
+
+        const QString projectFilePath = GetProjectFilePath(project.m_rootPath);
+        if (!NexusEngine::IO::SaveToFile(projectSettings, std::filesystem::path(projectFilePath.toStdWString()), NexusEngine::IO::FileFormat::Json))
+        {
+            return false;
+        }
 
         return AddRecentProject(project);
     }

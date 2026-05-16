@@ -10,6 +10,14 @@ namespace SampleGame
         float m_y = 0.0f;
         float m_z = 0.0f;
     };
+
+    struct World
+    {
+    };
+
+    struct WorldInitialized
+    {
+    };
 } // namespace SampleGame
 
 namespace NexusEngine
@@ -28,6 +36,26 @@ namespace NexusEngine
                 .field("x", &SampleGame::RotationSpeed::m_x)
                 .field("y", &SampleGame::RotationSpeed::m_y)
                 .field("z", &SampleGame::RotationSpeed::m_z);
+        }
+    };
+
+    template<>
+    struct ComponentMeta<SampleGame::World>
+    {
+        static void Register(flecs::world& world, MetadataRegistry& registry)
+        {
+            world.component<SampleGame::World>();
+            registry.component<SampleGame::World>("World");
+        }
+    };
+
+    template<>
+    struct ComponentMeta<SampleGame::WorldInitialized>
+    {
+        static void Register(flecs::world& world, MetadataRegistry& registry)
+        {
+            world.component<SampleGame::WorldInitialized>();
+            registry.component<SampleGame::WorldInitialized>("WorldInitialized");
         }
     };
 } // namespace NexusEngine

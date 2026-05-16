@@ -15,4 +15,11 @@ namespace SampleGame
     /// </summary>
     /// <returns>The created game implementation.</returns>
     std::unique_ptr<NexusEngine::IGameApp> CreateGame();
+
+    /// <summary>
+    /// Registers gameplay systems into the engine world and returns the created system entities.
+    /// </summary>
+    /// <param name="engine">Engine owning the gameplay world.</param>
+    /// <returns>The created gameplay system entities.</returns>
+    std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine);
 } // namespace SampleGame

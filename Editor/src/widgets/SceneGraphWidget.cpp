@@ -164,10 +164,10 @@ namespace NexusEditor
         m_treeWidget->setHeaderLabel(QStringLiteral("Scene - %1").arg(activeScene->m_name.c_str()));
 
         std::vector<flecs::entity> entities;
-        activeScene->m_world.each<NexusEngine::TransformComponent>(
+        activeScene->GetWorld().each<NexusEngine::TransformComponent>(
             [&](flecs::entity entity, NexusEngine::TransformComponent&)
             {
-                if (entity.is_valid() && entity.is_alive())
+                if (entity.is_valid() && entity.is_alive() && activeScene->ContainsEntity(entity))
                 {
                     if (entity.has<NexusEngine::EditorOnlyComponent>())
                     {
@@ -286,8 +286,8 @@ namespace NexusEditor
             return;
         }
 
-        const flecs::entity entity = activeScene->m_world.entity(static_cast<flecs::entity_t>(m_selectedEntityId));
-        if (!entity.is_valid() || !entity.is_alive())
+        const flecs::entity entity = activeScene->GetWorld().entity(static_cast<flecs::entity_t>(m_selectedEntityId));
+        if (!entity.is_valid() || !entity.is_alive() || !activeScene->ContainsEntity(entity))
         {
             return;
         }

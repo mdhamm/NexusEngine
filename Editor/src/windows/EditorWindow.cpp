@@ -77,6 +77,7 @@ namespace NexusEditor
 
     bool EditorWindow::SaveActiveScene(const QString& filePath, const QString& assetGuid) const
     {
+        REF(assetGuid);
         if (filePath.isEmpty())
         {
             return false;
@@ -101,10 +102,10 @@ namespace NexusEditor
         }
 
         std::vector<flecs::entity> entitiesToDestroy;
-        activeScene->m_world.each<NexusEngine::TransformComponent>(
-            [&](flecs::entity entity, NexusEngine::TransformComponent&)
+        activeScene->GetRootEntity().children(
+            [&](flecs::entity entity)
             {
-                if (!entity.is_valid() || !entity.is_alive())
+                if (!entity.is_valid() || !entity.is_alive() || !entity.has<NexusEngine::TransformComponent>())
                 {
                     return;
                 }
@@ -141,7 +142,6 @@ namespace NexusEditor
         }
 
         ResolveMaterialAssets();
-
         m_engine.RunFrame(deltaSeconds);
 
         if (m_propertyWidget)
@@ -174,10 +174,8 @@ namespace NexusEditor
     void EditorWindow::BuildMenus()
     {
         auto* fileMenu = menuBar()->addMenu(QStringLiteral("&File"));
-
         auto* saveAction = fileMenu->addAction(QStringLiteral("&Save Scene"));
         connect(saveAction, &QAction::triggered, this, [this]() { SaveScene(); });
-
         auto* saveAsAction = fileMenu->addAction(QStringLiteral("Save Scene &As..."));
         connect(saveAsAction, &QAction::triggered, this, [this]() { SaveSceneAs(); });
     }
@@ -415,9 +413,14 @@ namespace NexusEditor
             return;
         }
 
-        activeScene->m_world.each<NexusEngine::RenderMeshComponent>(
-            [this, factory](flecs::entity, NexusEngine::RenderMeshComponent& renderMesh)
+        activeScene->GetWorld().each<NexusEngine::RenderMeshComponent>(
+            [this, activeScene, factory](flecs::entity entity, NexusEngine::RenderMeshComponent& renderMesh)
             {
+                if (!activeScene->ContainsEntity(entity))
+                {
+                    return;
+                }
+
                 if (renderMesh.m_materialAssetReference.IsEmpty())
                 {
                     return;
@@ -527,8 +530,10 @@ namespace NexusEditor
         nativeWindow.m_width = std::max(1, m_sceneView->width());
         nativeWindow.m_height = std::max(1, m_sceneView->height());
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
-
         m_engine.Initialize(nativeWindow, std::move(game), m_project.m_rootPath.toStdString());
+
+        NexusEngine::Scene& sceneRef = m_engine.CreateScene("EditorScene");
+        m_engine.SetActiveScene(sceneRef);
     }
 
     void EditorWindow::SetSceneMode(bool isSceneMode)
@@ -537,25 +542,24 @@ namespace NexusEditor
 
         if (NexusEngine::Scene* activeScene = m_engine.ActiveScene())
         {
+            flecs::world& world = activeScene->GetWorld();
             if (m_isSceneMode)
             {
-                activeScene->m_world.remove<NexusEngine::GameplayEnabled>();
-                activeScene->m_world.remove<NexusEngine::PhysicsEnabled>();
+                world.remove<NexusEngine::GameplayEnabled>();
+                world.remove<NexusEngine::PhysicsEnabled>();
             }
             else
             {
-                activeScene->m_world.add<NexusEngine::GameplayEnabled>();
-                activeScene->m_world.add<NexusEngine::PhysicsEnabled>();
+                world.add<NexusEngine::GameplayEnabled>();
+                world.add<NexusEngine::PhysicsEnabled>();
             }
         }
 
         ConfigureEditorCamera();
-
         if (m_sceneGraph)
         {
             m_sceneGraph->Refresh();
         }
-
         if (m_propertyWidget)
         {
             m_propertyWidget->Refresh();
@@ -570,7 +574,7 @@ namespace NexusEditor
             return;
         }
 
-        flecs::entity editorCamera = activeScene->m_world.lookup("EditorCamera");
+        flecs::entity editorCamera = activeScene->FindEntityByName("EditorCamera");
         if (!m_hasLoadedScene)
         {
             if (editorCamera.is_valid())
@@ -582,7 +586,7 @@ namespace NexusEditor
 
         if (!editorCamera.is_valid())
         {
-            editorCamera = activeScene->m_world.entity("EditorCamera")
+            editorCamera = activeScene->CreateEntity("EditorCamera")
                 .add<NexusEngine::EditorOnlyComponent>()
                 .set(NexusEngine::TransformComponent::FromLocal(
                     Diligent::float3(0.0f, 0.0f, 10.0f),

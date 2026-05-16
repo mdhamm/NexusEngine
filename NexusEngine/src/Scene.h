@@ -1,35 +1,25 @@
 #pragma once
 
 #include <flecs.h>
-#include <string>
-#include <vector>
-#include <memory>
-#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
-#include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
-#include <DiligentCore/Graphics/GraphicsEngine/interface/TextureView.h>
 
-#include "GameLoopPhases.h"
-#include "rendering/GraphicsRenderer.h"
+#include <string>
 
 namespace NexusEngine
 {
-    struct CameraComponent;
     class Engine;
     class RenderResourceFactory;
 
-    // Lightweight scene wrapper around a Flecs world and render resources.
     struct Scene
     {
         /// <summary>
-        /// Creates a scene with its own ECS world and render resource factory.
+        /// Creates a scene wrapper whose entities live under a root entity in the engine world.
         /// </summary>
-        /// <param name="graphicsRenderer">Renderer used to create scene resources.</param>
         /// <param name="engine">Owning engine instance.</param>
         /// <param name="name">Initial scene name.</param>
-        Scene(GraphicsRenderer& graphicsRenderer, Engine& engine, const std::string& name = "Unnamed");
+        explicit Scene(Engine& engine, const std::string& name = "Unnamed");
 
         /// <summary>
-        /// Releases scene-owned resources.
+        /// Releases scene-owned entities from the engine world.
         /// </summary>
         ~Scene();
 
@@ -40,47 +30,54 @@ namespace NexusEngine
         void Update(float dt);
 
         /// <summary>
-        /// Creates a new entity in the scene world.
+        /// Creates a new entity under the scene root.
         /// </summary>
         /// <param name="name">Optional entity name.</param>
         /// <returns>The created entity handle.</returns>
-        inline flecs::entity CreateEntity(const char* name = nullptr)
-        {
-            return m_world.entity(name);
-        }
+        flecs::entity CreateEntity(const char* name = nullptr);
 
         /// <summary>
-        /// Destroys an entity if it is still alive.
+        /// Destroys an entity if it belongs to this scene and is still alive.
         /// </summary>
-        /// <param name="e">Entity to destroy.</param>
-        inline void DestroyEntity(flecs::entity e)
-        {
-            if (e.is_alive()) e.destruct();
-        }
+        /// <param name="entity">Entity to destroy.</param>
+        void DestroyEntity(flecs::entity entity);
+
+        /// <summary>
+        /// Returns whether an entity belongs to this scene hierarchy.
+        /// </summary>
+        /// <param name="entity">Entity to inspect.</param>
+        /// <returns>True if the entity is in this scene; otherwise false.</returns>
+        bool ContainsEntity(const flecs::entity& entity) const;
+
+        /// <summary>
+        /// Finds a named entity within this scene hierarchy.
+        /// </summary>
+        /// <param name="name">Entity name to locate.</param>
+        /// <returns>The matching entity, or an invalid entity when none exists.</returns>
+        flecs::entity FindEntityByName(const char* name) const;
+
+        /// <summary>
+        /// Returns the engine-owned world backing this scene.
+        /// </summary>
+        /// <returns>The shared engine world.</returns>
+        flecs::world& GetWorld() const;
+
+        /// <summary>
+        /// Returns the scene root entity.
+        /// </summary>
+        /// <returns>The scene root entity.</returns>
+        flecs::entity GetRootEntity() const { return m_rootEntity; }
 
         /// <summary>
         /// Returns the scene resource factory for meshes, materials, and shaders.
         /// </summary>
         /// <returns>The scene render resource factory.</returns>
-        RenderResourceFactory* GetResourceFactory() const { return m_resourceFactory.get(); }
+        RenderResourceFactory* GetResourceFactory() const;
 
-        // Scene display name.
         std::string m_name;
 
-        // ECS world that stores entities, components, and systems.
-        flecs::world m_world;
     private:
-        void RegisterSceneComponents();
-        void RegisterPhases();
-        void RegisterSystems();
-        bool EnsureInstanceTransformBufferCapacity(Diligent::Uint32 instanceCount);
-
-        GraphicsRenderer* m_graphicsRenderer;
-        Engine* m_engine;
-        std::unique_ptr<RenderResourceFactory> m_resourceFactory;
-        Diligent::RefCntAutoPtr<Diligent::IBuffer> m_instanceTransformBuffer;
-        Diligent::Uint32 m_instanceTransformCapacity = 0;
-        float m_clearAnimationTime = 0.0f;
+        Engine* m_engine = nullptr;
+        flecs::entity m_rootEntity;
     };
-
 } // namespace NexusEngine

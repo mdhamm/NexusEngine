@@ -129,6 +129,13 @@ namespace NexusEngine
 
         const ComponentMetadata* Get(TypeId type) const;
         const ComponentMetadata* FindByName(const std::string& name) const;
+        void Remove(TypeId type);
+
+        template<typename T>
+        void Remove()
+        {
+            Remove(std::type_index(typeid(T)));
+        }
 
         const std::unordered_map<TypeId, ComponentMetadata>& GetAll() const
         {
@@ -302,5 +309,11 @@ namespace NexusEngine
     {
         ComponentMeta<T>::Register(world, registry);
         registry.SetEntityAccessors<T>();
+    }
+
+    template<typename T>
+    void UnregisterComponent(MetadataRegistry& registry)
+    {
+        registry.Remove<T>();
     }
 } // namespace NexusEngine

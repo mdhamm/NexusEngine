@@ -1,14 +1,17 @@
 #pragma once
 
 #include "Scene.h"
+#include "GameLoopPhases.h"
 #include "input/InputState.h"
 #include "filesystem/AssetReferenceRegistry.h"
 #include "rendering/GraphicsRenderer.h"
+#include "rendering/RenderResourceFactory.h"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <SDL.h>
 #include <filesystem>
 #include <flecs.h>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -25,6 +28,7 @@ namespace Diligent
 namespace NexusEngine
 {
     class Engine;
+    class MetadataRegistry;
 
     // Game-facing interface implemented by runtime or sample code.
     class IGameApp
@@ -33,16 +37,53 @@ namespace NexusEngine
         virtual ~IGameApp() = default;
 
         /// <summary>
+        /// Registers game-specific component metadata.
+        /// </summary>
+        /// <param name="world">Scene world receiving component registration.</param>
+        /// <param name="metadataRegistry">Metadata registry receiving component metadata.</param>
+        virtual void RegisterComponentMetadata(flecs::world& world, MetadataRegistry& metadataRegistry)
+        {
+            REF(world);
+            REF(metadataRegistry);
+        }
+
+        /// <summary>
+        /// Unregisters game-specific component metadata during unload.
+        /// </summary>
+        /// <param name="metadataRegistry">Metadata registry to remove game metadata from.</param>
+        virtual void UnregisterComponentMetadata(MetadataRegistry& metadataRegistry)
+        {
+            REF(metadataRegistry);
+        }
+
+        /// <summary>
+        /// Registers gameplay systems into the engine world and returns the created system entities.
+        /// </summary>
+        /// <param name="engine">Engine owning the world that receives the systems.</param>
+        /// <returns>The created gameplay system entities.</returns>
+        virtual std::vector<flecs::entity> RegisterSystems(Engine& engine)
+        {
+            REF(engine);
+            return {};
+        }
+
+        /// <summary>
         /// Called once during engine startup to create scenes and game state.
         /// </summary>
         /// <param name="engine">Engine instance used to create and configure game state.</param>
-        virtual void OnStartup(Engine& engine) { REF(engine); };
+        virtual void OnStartup(Engine& engine)
+        {
+            REF(engine);
+        };
 
         /// <summary>
         /// Called during shutdown before engine resources are released.
         /// </summary>
         /// <param name="engine">Engine instance being shut down.</param>
-        virtual void OnShutdown(Engine& engine) { REF(engine); };
+        virtual void OnShutdown(Engine& engine)
+        {
+            REF(engine);
+        };
     };
 
     // Main engine entry point that owns rendering and scene lifetime.
@@ -75,24 +116,23 @@ namespace NexusEngine
         void RunFrame(float dt);
 
         /// <summary>
-        /// Creates and stores a named scene.
+        /// Loads the project's configured default scene into the engine.
         /// </summary>
-        /// <param name="name">Name assigned to the new scene.</param>
+        /// <returns>True if the default scene was loaded; otherwise false.</returns>
+        bool LoadDefaultScene();
+
+        /// <summary>
+        /// Creates a scene owned by the engine.
+        /// </summary>
+        /// <param name="name">Name of the scene to create.</param>
         /// <returns>A reference to the created scene.</returns>
         Scene& CreateScene(const std::string& name);
 
         /// <summary>
-        /// Removes a scene by name.
+        /// Removes a scene.
         /// </summary>
-        /// <param name="name">Name of the scene to remove.</param>
-        void RemoveScene(const std::string& name);
-
-        /// <summary>
-        /// Finds a scene by name.
-        /// </summary>
-        /// <param name="name">Name of the scene to locate.</param>
-        /// <returns>A pointer to the scene if found; otherwise null.</returns>
-        Scene* FindScene(const std::string& name);
+        /// <param name="scene">Scene to remove.</param>
+        void RemoveScene(Scene& scene);
 
         /// <summary>
         /// Returns the currently active scene.
@@ -101,10 +141,10 @@ namespace NexusEngine
         Scene* ActiveScene() { return m_activeScene; }
 
         /// <summary>
-        /// Sets the active scene by name.
+        /// Sets the active scene.
         /// </summary>
-        /// <param name="name">Name of the scene to activate.</param>
-        void SetActiveScene(const std::string& name);
+        /// <param name="scene">Scene to activate.</param>
+        void SetActiveScene(Scene& scene);
 
         /// <summary>
         /// Returns the current input state for the frame.
@@ -129,8 +169,17 @@ namespace NexusEngine
 
         IO::AssetReferenceRegistry* GetAssetReferenceRegistry() { return m_assetReferenceRegistry; }
 
+        flecs::world& GetWorld() { return m_world; }
+
+        RenderResourceFactory* GetResourceFactory() { return m_resourceFactory.get(); }
+
     private:
         void Tick(float dt);
+        void RegisterEngineWorldState();
+        void RegisterEngineSystems();
+        void RegisterGameSystems();
+        void UnregisterGameSystems();
+        bool EnsureInstanceTransformBufferCapacity(Diligent::Uint32 instanceCount);
 
     private:
         // Tracks whether initialization completed successfully.
@@ -148,6 +197,9 @@ namespace NexusEngine
         // Rendering backend used by the engine.
         GraphicsRenderer m_graphicsRenderer;
 
+        // Flecs world for scene and engine-level systems
+        flecs::world m_world;
+
         // Owned scenes managed by the engine.
         std::vector<std::unique_ptr<Scene>> m_scenes;
 
@@ -161,7 +213,15 @@ namespace NexusEngine
 
         std::filesystem::path m_projectRoot;
 
-        IO::AssetReferenceRegistry* m_assetReferenceRegistry;
+        IO::AssetReferenceRegistry* m_assetReferenceRegistry = nullptr;
+        std::vector<flecs::entity_t> m_registeredGameSystemIds;
+
+        std::unique_ptr<RenderResourceFactory> m_resourceFactory;
+
+        Diligent::RefCntAutoPtr<Diligent::IBuffer> m_instanceTransformBuffer;
+        Diligent::Uint32 m_instanceTransformCapacity = 0;
+
+        float m_clearAnimationTime = 0.0f;
 
         struct UiState
         {

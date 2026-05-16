@@ -4,11 +4,14 @@
 
 namespace NexusEditor
 {
+    std::vector<flecs::entity> EditorSceneApp::RegisterSystems(NexusEngine::Engine& engine)
+    {
+        REF(engine);
+        return {};
+    }
+
     void EditorSceneApp::OnStartup(NexusEngine::Engine& engine)
     {
-        NexusEngine::Scene& scene = engine.CreateScene("EditorScene");
-        engine.SetActiveScene("EditorScene");
-
-        (void)scene;
+        REF(engine);
     }
 } // namespace NexusEditor

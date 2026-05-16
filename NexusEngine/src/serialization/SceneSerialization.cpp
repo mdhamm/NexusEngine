@@ -25,10 +25,16 @@ namespace NexusEngine
 
             Mesh* cubeMesh = nullptr;
             Material* unlitMaterial = nullptr;
+            flecs::world& world = scene.GetWorld();
 
-            scene.m_world.each<RenderMeshComponent>(
-                [&](flecs::entity, RenderMeshComponent& renderMesh)
+            world.each<RenderMeshComponent>(
+                [&](flecs::entity entity, RenderMeshComponent& renderMesh)
                 {
+                    if (!scene.ContainsEntity(entity))
+                    {
+                        return;
+                    }
+
                     if (renderMesh.mesh && (renderMesh.material || !renderMesh.m_materialAssetReference.IsEmpty()))
                     {
                         return;
@@ -61,16 +67,16 @@ namespace NexusEngine
     {
         writer.Write("name", scene.m_name);
         writer.BeginArray("entities");
-        scene.m_world.each<TransformComponent>(
-            [&](flecs::entity entity, TransformComponent&)
+        scene.GetRootEntity().children(
+            [&](flecs::entity entity)
             {
-                if (!entity.is_valid() || !entity.is_alive() || entity.has<EditorOnlyComponent>())
+                if (!entity.is_valid() || !entity.is_alive() || !entity.has<TransformComponent>() || entity.has<EditorOnlyComponent>())
                 {
                     return;
                 }
 
                 writer.BeginArrayElement();
-                SerializeEntity(entity, writer);
+                SerializeEntity(entity, scene.GetRootEntity(), writer);
                 writer.EndArrayElement();
             });
         writer.EndArray();
@@ -93,16 +99,13 @@ namespace NexusEngine
         };
 
         std::unordered_map<std::uint64_t, PendingEntity> pendingEntities;
-
         const std::size_t entityCount = reader.GetArraySize("entities");
         pendingEntities.reserve(entityCount);
 
-        // First pass: Create all entities and store their original IDs and parent IDs.
         reader.BeginArray("entities");
         for (std::size_t entityIndex = 0; entityIndex < entityCount; ++entityIndex)
         {
             reader.BeginArrayElement(entityIndex);
-
             SerializedEntityHeader header;
             if (DeserializeEntityHeader(header, reader))
             {
@@ -113,36 +116,31 @@ namespace NexusEngine
                 pendingEntity.m_parentId = header.m_parentId;
                 pendingEntities.emplace(header.m_id, std::move(pendingEntity));
             }
-
             reader.EndArrayElement();
         }
         reader.EndArray();
 
-        // Second pass: Deserialize entity components and data. Parent-child relationships will be resolved after all entities have been created.
         reader.BeginArray("entities");
         for (std::size_t entityIndex = 0; entityIndex < entityCount; ++entityIndex)
         {
             reader.BeginArrayElement(entityIndex);
-
             std::uint64_t originalId = 0;
             reader.Read("id", originalId);
-
             const auto pendingIt = pendingEntities.find(originalId);
             if (pendingIt != pendingEntities.end())
             {
                 (void)DeserializeEntity(pendingIt->second.m_entity, reader);
             }
-
             reader.EndArrayElement();
         }
         reader.EndArray();
 
-        // After all entities have been created, we can resolve parent-child relationships.
         for (auto& [originalId, pendingEntity] : pendingEntities)
         {
             (void)originalId;
             if (pendingEntity.m_parentId == 0)
             {
+                pendingEntity.m_entity.child_of(scene.GetRootEntity());
                 continue;
             }
 
@@ -151,10 +149,13 @@ namespace NexusEngine
             {
                 pendingEntity.m_entity.child_of(parentIt->second.m_entity);
             }
+            else
+            {
+                pendingEntity.m_entity.child_of(scene.GetRootEntity());
+            }
         }
 
         AssignDefaultRenderResources(scene);
         return true;
     }
-
 } // namespace NexusEngine
