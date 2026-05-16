@@ -99,7 +99,8 @@ int main(int argc, char** argv)
     nativeWindow.m_hWnd = hWnd;
 
     NexusEngine::Engine engine;
-    engine.Initialize(nativeWindow, std::move(game), "");
+    engine.Initialize(nativeWindow, "");
+    engine.LoadGame(*game);
     engine.Start();
     engine.Shutdown();
 

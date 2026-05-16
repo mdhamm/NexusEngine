@@ -332,22 +332,18 @@ namespace SampleGame
         }
     };
 
-    std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine)
-    {
-        return BuildSystems(engine);
-    }
-
     std::unique_ptr<NexusEngine::IGameApp> CreateGame()
     {
         return std::make_unique<Game>();
     }
 
-    void RegisterEditorComponentDescriptors()
+    extern "C" NexusEngine::IGameApp* LoadGame()
     {
-        flecs::world world;
-        NexusEngine::MetadataRegistry& metadataRegistry = NexusEngine::MetadataRegistry::Instance();
-        NexusEngine::RegisterComponent<RotationSpeed>(world, metadataRegistry);
-        NexusEngine::RegisterComponent<World>(world, metadataRegistry);
-        NexusEngine::RegisterComponent<WorldInitialized>(world, metadataRegistry);
+        return new Game();
+    }
+
+    extern "C" void UnloadGame(NexusEngine::IGameApp* game)
+    {
+        delete game;
     }
 } // namespace SampleGame

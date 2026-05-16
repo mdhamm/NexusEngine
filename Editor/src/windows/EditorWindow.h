@@ -9,6 +9,8 @@
 #include <QDateTime>
 #include <QMainWindow>
 
+struct HINSTANCE__;
+
 #include <string>
 #include <functional>
 #include <vector>
@@ -42,7 +44,7 @@ namespace NexusEditor
         /// <summary>
         /// Destroys the main editor window.
         /// </summary>
-        ~EditorWindow() override = default;
+        ~EditorWindow() override;
 
         /// <summary>
         /// Returns the engine instance hosted by the editor window.
@@ -120,6 +122,9 @@ namespace NexusEditor
         void SetSceneMode(bool isSceneMode);
         void ConfigureEditorCamera();
         void SetInspectedTarget(const InspectedTarget& inspectedTarget);
+        bool HotReloadGame();
+        bool LoadHotReloadedGame(const std::filesystem::path& sourceDllPath);
+        void UnloadHotReloadedGame();
         QString ResolveSceneFilePath() const;
         std::string CaptureActiveSceneSnapshot() const;
         bool IsCurrentSceneDirty() const;
@@ -147,5 +152,12 @@ namespace NexusEditor
         };
 
         QHash<QString, MaterialAssetCacheEntry> m_materialAssetCache;
+        HINSTANCE__* m_hotReloadedGameModule = nullptr;
+        NexusEngine::IGameApp* m_hotReloadedGame = nullptr;
+        std::filesystem::path m_hotReloadedGameCopyPath;
+        std::filesystem::path m_hotReloadedGamePdbCopyPath;
+        using LoadGameFn = NexusEngine::IGameApp* (*)();
+        using UnloadGameFn = void (*)(NexusEngine::IGameApp* game);
+        UnloadGameFn m_hotReloadedGameUnloadFn = nullptr;
     };
 } // namespace NexusEditor

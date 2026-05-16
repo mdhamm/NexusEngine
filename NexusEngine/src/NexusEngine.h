@@ -91,18 +91,35 @@ namespace NexusEngine
     {
     public:
         /// <summary>
-        /// Initializes the engine against a native window and game instance.
+        /// Initializes the engine against a native window.
         /// </summary>
         /// <param name="win">Native window description used for renderer startup.</param>
-        /// <param name="game">Game implementation owned by the engine.</param>
         /// <param name="projectRoot">Root directory of the current project, used for asset loading.</param>
         /// <returns>True if initialization succeeds; otherwise false.</returns>
-        bool Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectRoot);
+        bool Initialize(const NativeWindow& win, std::filesystem::path projectRoot);
+
+        /// <summary>
+        /// Loads a game into the initialized engine.
+        /// </summary>
+        /// <param name="game">Game implementation to load.</param>
+        /// <returns>True if the game was loaded; otherwise false.</returns>
+        bool LoadGame(IGameApp& game);
+
+        /// <summary>
+        /// Unloads the current game from the engine.
+        /// </summary>
+        void UnloadGame();
 
         /// <summary>
         /// Releases engine-owned resources and shuts the game down.
         /// </summary>
         void Shutdown();
+
+        /// <summary>
+        /// Returns whether the engine has been initialized.
+        /// </summary>
+        /// <returns>True if the engine is initialized; otherwise false.</returns>
+        bool IsInitialized() const { return m_initialized; }
 
         /// <summary>
         /// Runs the main blocking game loop.
@@ -193,6 +210,8 @@ namespace NexusEngine
 
         // Non-owning pointer to the active game implementation.
         IGameApp* m_game = nullptr;
+
+        bool m_gameStarted = false;
 
         // Rendering backend used by the engine.
         GraphicsRenderer m_graphicsRenderer;

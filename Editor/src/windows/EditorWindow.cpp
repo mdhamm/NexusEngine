@@ -26,19 +26,24 @@
 #include <QStatusBar>
 #include <QVBoxLayout>
 
+#include <Windows.h>
+
 #ifdef emit
 #undef emit
 #endif
-
-#include <Game.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <system_error>
 
 #ifndef NEXUS_EDITOR_CONTENT_ROOT
 #define NEXUS_EDITOR_CONTENT_ROOT "."
+#endif
+
+#ifdef max
+#undef max
 #endif
 
 namespace NexusEditor
@@ -63,6 +68,15 @@ namespace NexusEditor
         }
         SetSceneMode(true);
         statusBar()->showMessage(QStringLiteral("Ready - %1").arg(m_project.m_rootPath));
+    }
+
+    EditorWindow::~EditorWindow()
+    {
+        UnloadHotReloadedGame();
+        if (m_engine.IsInitialized())
+        {
+            m_engine.Shutdown();
+        }
     }
 
     NexusEngine::Engine* EditorWindow::GetEngine()
@@ -178,6 +192,9 @@ namespace NexusEditor
         connect(saveAction, &QAction::triggered, this, [this]() { SaveScene(); });
         auto* saveAsAction = fileMenu->addAction(QStringLiteral("Save Scene &As..."));
         connect(saveAsAction, &QAction::triggered, this, [this]() { SaveSceneAs(); });
+        fileMenu->addSeparator();
+        auto* hotReloadGameAction = fileMenu->addAction(QStringLiteral("&Hot Reload Game"));
+        connect(hotReloadGameAction, &QAction::triggered, this, [this]() { HotReloadGame(); });
     }
 
     void EditorWindow::BuildLayout()
@@ -518,22 +535,137 @@ namespace NexusEditor
             return;
         }
 
-        SampleGame::RegisterEditorComponentDescriptors();
-
-        std::unique_ptr<NexusEngine::IGameApp> game = std::make_unique<EditorSceneApp>();
-        if (!game)
-        {
-            return;
-        }
-
         NexusEngine::NativeWindow nativeWindow{};
         nativeWindow.m_width = std::max(1, m_sceneView->width());
         nativeWindow.m_height = std::max(1, m_sceneView->height());
         nativeWindow.m_hWnd = reinterpret_cast<void*>(m_sceneView->winId());
-        m_engine.Initialize(nativeWindow, std::move(game), m_project.m_rootPath.toStdString());
+        m_engine.Initialize(nativeWindow, m_project.m_rootPath.toStdString());
+
+        static EditorSceneApp editorSceneApp;
+        m_engine.LoadGame(editorSceneApp);
 
         NexusEngine::Scene& sceneRef = m_engine.CreateScene("EditorScene");
         m_engine.SetActiveScene(sceneRef);
+    }
+
+    bool EditorWindow::HotReloadGame()
+    {
+        const QString dllPath = QFileDialog::getOpenFileName(
+            this,
+            QStringLiteral("Select Game DLL"),
+            m_project.m_rootPath,
+            QStringLiteral("Dynamic Libraries (*.dll)"));
+
+        if (dllPath.isEmpty())
+        {
+            return false;
+        }
+
+        return LoadHotReloadedGame(std::filesystem::path(dllPath.toStdWString()));
+    }
+
+    bool EditorWindow::LoadHotReloadedGame(const std::filesystem::path& sourceDllPath)
+    {
+        if (!m_engine.IsInitialized())
+        {
+            return false;
+        }
+
+        UnloadHotReloadedGame();
+
+        const std::filesystem::path sourceDirectory = sourceDllPath.parent_path();
+        const std::filesystem::path hotReloadDirectory = std::filesystem::path(m_project.m_rootPath.toStdWString()) / L"Temp" / L"HotReload";
+        std::error_code errorCode;
+        std::filesystem::create_directories(hotReloadDirectory, errorCode);
+        if (errorCode)
+        {
+            statusBar()->showMessage(QStringLiteral("Failed to prepare hot reload directory"), 3000);
+            return false;
+        }
+
+        const QString uniqueSuffix = QString::number(QDateTime::currentMSecsSinceEpoch());
+        m_hotReloadedGameCopyPath = hotReloadDirectory / std::filesystem::path((QStringLiteral("SampleGame_") + uniqueSuffix + QStringLiteral(".dll")).toStdWString());
+        m_hotReloadedGamePdbCopyPath = hotReloadDirectory / std::filesystem::path((QStringLiteral("SampleGame_") + uniqueSuffix + QStringLiteral(".pdb")).toStdWString());
+
+        std::filesystem::copy_file(sourceDllPath, m_hotReloadedGameCopyPath, std::filesystem::copy_options::overwrite_existing, errorCode);
+        if (errorCode)
+        {
+            statusBar()->showMessage(QStringLiteral("Failed to copy game DLL for hot reload"), 3000);
+            return false;
+        }
+
+        const std::filesystem::path sourcePdbPath = sourceDirectory / sourceDllPath.stem();
+        const std::filesystem::path sourcePdbFilePath = sourcePdbPath;
+        std::filesystem::path pdbPath = sourceDllPath;
+        pdbPath.replace_extension(L".pdb");
+        if (std::filesystem::exists(pdbPath))
+        {
+            std::filesystem::copy_file(pdbPath, m_hotReloadedGamePdbCopyPath, std::filesystem::copy_options::overwrite_existing, errorCode);
+            errorCode.clear();
+        }
+
+        m_hotReloadedGameModule = ::LoadLibraryW(m_hotReloadedGameCopyPath.c_str());
+        if (!m_hotReloadedGameModule)
+        {
+            statusBar()->showMessage(QStringLiteral("Failed to load game DLL"), 3000);
+            return false;
+        }
+
+        auto loadGameFn = reinterpret_cast<LoadGameFn>(::GetProcAddress(reinterpret_cast<HMODULE>(m_hotReloadedGameModule), "LoadGame"));
+        m_hotReloadedGameUnloadFn = reinterpret_cast<UnloadGameFn>(::GetProcAddress(reinterpret_cast<HMODULE>(m_hotReloadedGameModule), "UnloadGame"));
+        if (!loadGameFn || !m_hotReloadedGameUnloadFn)
+        {
+            UnloadHotReloadedGame();
+            statusBar()->showMessage(QStringLiteral("Game DLL is missing LoadGame or UnloadGame exports"), 3000);
+            return false;
+        }
+
+        m_hotReloadedGame = loadGameFn();
+        if (!m_hotReloadedGame)
+        {
+            UnloadHotReloadedGame();
+            statusBar()->showMessage(QStringLiteral("Game DLL failed to create a game instance"), 3000);
+            return false;
+        }
+
+        m_engine.LoadGame(*m_hotReloadedGame);
+        statusBar()->showMessage(QStringLiteral("Hot reloaded game from %1").arg(QString::fromStdWString(sourceDllPath.wstring())), 3000);
+        return true;
+    }
+
+    void EditorWindow::UnloadHotReloadedGame()
+    {
+        if (m_hotReloadedGame)
+        {
+            m_engine.UnloadGame();
+            if (m_hotReloadedGameUnloadFn)
+            {
+                m_hotReloadedGameUnloadFn(m_hotReloadedGame);
+            }
+            m_hotReloadedGame = nullptr;
+        }
+
+        m_hotReloadedGameUnloadFn = nullptr;
+
+        if (m_hotReloadedGameModule)
+        {
+            ::FreeLibrary(reinterpret_cast<HMODULE>(m_hotReloadedGameModule));
+            m_hotReloadedGameModule = nullptr;
+        }
+
+        if (!m_hotReloadedGameCopyPath.empty())
+        {
+            std::error_code errorCode;
+            std::filesystem::remove(m_hotReloadedGameCopyPath, errorCode);
+            m_hotReloadedGameCopyPath.clear();
+        }
+
+        if (!m_hotReloadedGamePdbCopyPath.empty())
+        {
+            std::error_code errorCode;
+            std::filesystem::remove(m_hotReloadedGamePdbCopyPath, errorCode);
+            m_hotReloadedGamePdbCopyPath.clear();
+        }
     }
 
     void EditorWindow::SetSceneMode(bool isSceneMode)

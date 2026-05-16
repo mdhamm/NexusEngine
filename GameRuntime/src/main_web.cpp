@@ -55,9 +55,15 @@ int main()
     nw.m_height = 720;
     nw.m_canvasId = "#canvas";
 
-    if (!g_engine.Initialize(nw, std::move(game), std::filesystem::current_path()))
+    if (!g_engine.Initialize(nw, std::filesystem::current_path()))
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Engine initialization failed");
+        return 1;
+    }
+
+    if (!g_engine.LoadGame(*game))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game load failed");
         return 1;
     }
 

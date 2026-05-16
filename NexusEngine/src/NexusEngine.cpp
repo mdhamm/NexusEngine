@@ -109,17 +109,11 @@ namespace NexusEngine
         }
     }
 
-    bool Engine::Initialize(const NativeWindow& win, std::unique_ptr<IGameApp> game, std::filesystem::path projectRoot)
+    bool Engine::Initialize(const NativeWindow& win, std::filesystem::path projectRoot)
     {
         m_projectRoot = std::move(projectRoot);
-        assert(game);
-        if (!game)
-        {
-            return false;
-        }
 
         bool success = true;
-        m_game = game.release();
 
         m_assetReferenceRegistry = new IO::AssetReferenceRegistry(m_projectRoot);
         success &= m_graphicsRenderer.CreateDeviceAndSwapchain(win);
@@ -131,18 +125,46 @@ namespace NexusEngine
         }
 
         RegisterBuiltinComponents(m_world);
-        if (m_game)
-        {
-            m_game->RegisterComponentMetadata(m_world, MetadataRegistry::Instance());
-        }
 
         RegisterEngineWorldState();
         RegisterEngineSystems();
-        RegisterGameSystems();
 
         assert(success);
         m_initialized = success;
         return success;
+    }
+
+    bool Engine::LoadGame(IGameApp& game)
+    {
+        if (!m_initialized || m_game == &game)
+        {
+            return m_initialized && m_game == &game;
+        }
+
+        UnloadGame();
+
+        m_game = &game;
+        m_game->RegisterComponentMetadata(m_world, MetadataRegistry::Instance());
+        RegisterGameSystems();
+        return true;
+    }
+
+    void Engine::UnloadGame()
+    {
+        if (!m_game)
+        {
+            return;
+        }
+
+        if (m_gameStarted)
+        {
+            m_game->OnShutdown(*this);
+            m_gameStarted = false;
+        }
+
+        UnregisterGameSystems();
+        m_game->UnregisterComponentMetadata(MetadataRegistry::Instance());
+        m_game = nullptr;
     }
 
     void Engine::Shutdown()
@@ -155,17 +177,8 @@ namespace NexusEngine
 
         m_scenes.clear();
         m_activeScene = nullptr;
-        UnregisterGameSystems();
-
-        if (m_started && m_game)
-        {
-            m_game->OnShutdown(*this);
-            m_game->UnregisterComponentMetadata(MetadataRegistry::Instance());
-            m_started = false;
-        }
-
-        delete m_game;
-        m_game = nullptr;
+        UnloadGame();
+        m_started = false;
 
         if (m_assetReferenceRegistry)
         {
@@ -207,9 +220,10 @@ namespace NexusEngine
         if (!m_started)
         {
             m_started = true;
-            if (m_game)
+            if (m_game && !m_gameStarted)
             {
                 m_game->OnStartup(*this);
+                m_gameStarted = true;
             }
 
             if (!m_activeScene)

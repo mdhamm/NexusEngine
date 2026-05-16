@@ -46,7 +46,7 @@ else()
     src/EditorProject.h
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
-    src/EditorSceneApp.cpp
+    
     src/EditorSceneApp.h
     src/EditorSceneSerializer.cpp
     src/EditorSceneSerializer.h
@@ -69,7 +69,7 @@ endif()
 
 add_executable(Editor ${GAME_MAIN})
 
-target_link_libraries(Editor PRIVATE SampleGame)
+target_link_libraries(Editor PRIVATE NexusEngine)
 
 target_include_directories(Editor PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
