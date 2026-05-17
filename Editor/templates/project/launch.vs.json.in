@@ -1,0 +1,21 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "{{PROJECT_NAME}}.exe ({{PROJECT_NAME}}\\{{PROJECT_NAME}}.exe)",
+      "name": "{{PROJECT_NAME}}.exe ({{PROJECT_NAME}}\\{{PROJECT_NAME}}.exe)"
+    },
+    {
+      "type": "native",
+      "name": "Editor.exe ({{PROJECT_NAME}})",
+      "program": "{{WORKSPACE_ROOT}}/out/build/editor-x64-debug/Editor/Editor.exe",
+      "currentDir": "{{WORKSPACE_ROOT}}",
+      "args": [
+        "{{PROJECT_ROOT}}"
+      ]
+    }
+  ]
+}

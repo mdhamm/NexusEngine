@@ -44,6 +44,8 @@ else()
     src/widgets/ContentDrawerWidget.cpp
     src/widgets/ContentDrawerWidget.h
     src/EditorProject.h
+    src/EditorProjectBuilder.cpp
+    src/EditorProjectBuilder.h
     src/EditorProjectRegistry.cpp
     src/EditorProjectRegistry.h
     

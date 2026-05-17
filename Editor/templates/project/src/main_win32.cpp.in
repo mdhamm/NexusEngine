@@ -1,0 +1,123 @@
+#include <NexusEngine.h>
+#include <EngineComponentRegistration.h>
+#include <input/SdlInpuBackend.h>
+
+#include <SDL.h>
+#include <SDL_syswm.h>
+#include <cstdio>
+#include <filesystem>
+#include <memory>
+
+extern "C" NexusEngine::IGameApp* LoadGame();
+extern "C" void UnloadGame(NexusEngine::IGameApp* game);
+
+namespace
+{
+    void ReportError(const char* title, const char* detail)
+    {
+        std::fprintf(stderr, "%s: %s\n", title, detail ? detail : "(no detail)");
+    }
+}
+
+int main(int, char**)
+{
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER) != 0)
+    {
+        ReportError("SDL_Init failed", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("{{PROJECT_NAME}}", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    if (!window)
+    {
+        ReportError("SDL_CreateWindow failed", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    NexusEngine::NativeWindow nativeWindow{};
+    nativeWindow.m_width = 1280;
+    nativeWindow.m_height = 720;
+    nativeWindow.m_hWnd = nullptr;
+
+#if defined(_WIN32)
+    SDL_SysWMinfo wmInfo{};
+    SDL_VERSION(&wmInfo.version);
+    if (!SDL_GetWindowWMInfo(window, &wmInfo))
+    {
+        ReportError("SDL_GetWindowWMInfo failed", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    nativeWindow.m_hWnd = wmInfo.info.win.window;
+#endif
+
+    NexusEngine::Engine engine;
+    if (!engine.Initialize(nativeWindow, std::filesystem::current_path()))
+    {
+        ReportError("Engine initialization failed", "Unable to initialize NexusEngine");
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    NexusEngine::RegisterEngineComponentTypes(engine.GetWorld());
+    NexusEngine::SdlInputBackend inputBackend;
+    inputBackend.SetInputState(&engine.GetInputState());
+    engine.SetInputBackend(&inputBackend);
+
+    std::unique_ptr<NexusEngine::IGameApp, void(*)(NexusEngine::IGameApp*)> game(LoadGame(), [](NexusEngine::IGameApp* gameInstance)
+    {
+        if (gameInstance)
+        {
+            UnloadGame(gameInstance);
+        }
+    });
+
+    if (!game || !engine.LoadGame(*game))
+    {
+        ReportError("Game load failed", "Unable to load the project game");
+        engine.Shutdown();
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    engine.LoadDefaultScene();
+
+    bool running = true;
+    Uint64 previousCounter = SDL_GetPerformanceCounter();
+    while (running)
+    {
+        SDL_Event event{};
+        while (SDL_PollEvent(&event))
+        {
+            if (event.type == SDL_QUIT)
+            {
+                running = false;
+            }
+            else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+            {
+                engine.ResizeOutput(event.window.data1, event.window.data2);
+            }
+            else if (event.type == SDL_MOUSEWHEEL)
+            {
+                inputBackend.AddMouseWheelDelta(static_cast<float>(event.wheel.preciseY));
+            }
+        }
+
+        const Uint64 currentCounter = SDL_GetPerformanceCounter();
+        const float deltaSeconds = static_cast<float>(currentCounter - previousCounter) / static_cast<float>(SDL_GetPerformanceFrequency());
+        previousCounter = currentCounter;
+
+        engine.RunFrame(deltaSeconds);
+    }
+
+    engine.UnloadGame();
+    engine.Shutdown();
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return 0;
+}

@@ -35,5 +35,12 @@ namespace NexusEditor
         /// <param name="projectRootPath">Project root directory.</param>
         /// <returns>The metadata file path.</returns>
         static QString GetProjectFilePath(const QString& projectRootPath);
+
+        /// <summary>
+        /// Adds or updates a recent project entry without exposing the persistence implementation.
+        /// </summary>
+        /// <param name="project">Project to store in the recent project list.</param>
+        /// <returns>True if the recent project list was updated; otherwise false.</returns>
+        static bool SaveRecentProject(const EditorProject& project);
     };
 } // namespace NexusEditor

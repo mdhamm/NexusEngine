@@ -1,9 +1,12 @@
 #include <QApplication>
+#include <QDir>
+#include <QFileInfo>
 
 #include <SDL.h>
 #include <cstdio>
 #include <memory>
 
+#include "EditorProjectRegistry.h"
 #include "EditorWindow.h"
 #include "ProjectBrowserWindow.h"
 
@@ -29,8 +32,41 @@ int main(int argc, char** argv)
     app.setApplicationName(QStringLiteral("Nexus Editor"));
     app.setOrganizationName(QStringLiteral("NexusEngine"));
 
-    NexusEditor::ProjectBrowserWindow projectBrowser;
     std::unique_ptr<NexusEditor::EditorWindow> editorWindow;
+    const QStringList arguments = app.arguments();
+
+    if (arguments.size() >= 2)
+    {
+        NexusEditor::EditorProject project;
+        project.m_rootPath = QDir::cleanPath(arguments[1]);
+
+        if (QFileInfo::exists(project.m_rootPath))
+        {
+            const QVector<NexusEditor::EditorProject> recentProjects = NexusEditor::EditorProjectRegistry::LoadRecentProjects();
+            for (const NexusEditor::EditorProject& recentProject : recentProjects)
+            {
+                if (recentProject.m_rootPath.compare(project.m_rootPath, Qt::CaseInsensitive) == 0)
+                {
+                    project = recentProject;
+                    break;
+                }
+            }
+
+            if (project.m_name.isEmpty())
+            {
+                project.m_name = QFileInfo(project.m_rootPath).fileName();
+            }
+
+            editorWindow = std::make_unique<NexusEditor::EditorWindow>(project);
+            editorWindow->show();
+
+            const int exitCode = app.exec();
+            SDL_Quit();
+            return exitCode;
+        }
+    }
+
+    NexusEditor::ProjectBrowserWindow projectBrowser;
 
     projectBrowser.SetProjectOpenedCallback(
         [&](const NexusEditor::EditorProject& project)

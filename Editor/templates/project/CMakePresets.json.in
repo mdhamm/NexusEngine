@@ -1,0 +1,113 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/Intermediate/${presetName}",
+            "installDir": "${sourceDir}/Intermediate/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "editor-debug",
+            "displayName": "Editor Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "editor-debug",
+                "NEXUS_PROJECT_EDITOR_MODE": "ON"
+            }
+        },
+        {
+            "name": "editor-release",
+            "displayName": "Editor Release",
+            "inherits": "editor-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "editor-release",
+                "NEXUS_PROJECT_EDITOR_MODE": "ON"
+            }
+        },
+        {
+            "name": "game-x64-debug",
+            "displayName": "Game x64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "x64-debug",
+                "NEXUS_PROJECT_EDITOR_MODE": "OFF"
+            }
+        },
+        {
+            "name": "game-x64-release",
+            "displayName": "Game x64 Release",
+            "inherits": "game-x64-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "x64-release",
+                "NEXUS_PROJECT_EDITOR_MODE": "OFF"
+            }
+        },
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "inherits": "game-x64-debug"
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "inherits": "game-x64-release"
+        },
+        {
+            "name": "web-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/Intermediate/${presetName}",
+            "installDir": "${sourceDir}/Intermediate/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "BUILD_WEB": "ON"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "web-debug",
+            "displayName": "Web Debug",
+            "inherits": "web-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "web-debug"
+            }
+        },
+        {
+            "name": "web-release",
+            "displayName": "Web Release",
+            "inherits": "web-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_PROJECT_OUTPUT_SUBDIR": "web-release"
+            }
+        }
+    ]
+}

@@ -33,14 +33,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 endif()
 
 if(NOT BUILD_WEB)
-  option(NEXUS_BUILD_EDITOR "Build the Qt-based editor target" ON)
+  option(NEXUS_BUILD_EDITOR "Build the Qt-based editor target" OFF)
 else()
-  set(NEXUS_BUILD_EDITOR OFF)
+  set(NEXUS_BUILD_EDITOR OFF CACHE BOOL "Build the Qt-based editor target" FORCE)
 endif()
 
 option(NEXUS_EDITOR_MODE "Build NexusEngine for editor-hosted DLL mode" OFF)
 if(NOT BUILD_WEB AND NEXUS_BUILD_EDITOR)
   set(NEXUS_EDITOR_MODE ON CACHE BOOL "Build NexusEngine for editor-hosted DLL mode" FORCE)
+else()
+  set(NEXUS_EDITOR_MODE OFF CACHE BOOL "Build NexusEngine for editor-hosted DLL mode" FORCE)
 endif()
 
 # ---------------- Diligent (extern) ----------------

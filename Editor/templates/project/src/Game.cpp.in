@@ -1,0 +1,49 @@
+#include <NexusEngine.h>
+#include <EngineComponentRegistration.h>
+#include <filesystem/AssetGuid.h>
+#include <vector>
+
+#if defined(_WIN32)
+#if defined(PROJECTGAME_EXPORTS)
+#define PROJECTGAME_API __declspec(dllexport)
+#else
+#define PROJECTGAME_API __declspec(dllimport)
+#endif
+#else
+#define PROJECTGAME_API
+#endif
+
+namespace
+{
+    class ProjectGame final : public NexusEngine::IGameApp
+    {
+    public:
+        void RegisterComponentMetadata(flecs::world& world, NexusEngine::MetadataRegistry& metadataRegistry) override
+        {
+            NexusEngine::RegisterEngineComponentTypes(world);
+            REF(world);
+            REF(metadataRegistry);
+        }
+
+        void UnregisterComponentMetadata(NexusEngine::MetadataRegistry& metadataRegistry) override
+        {
+            REF(metadataRegistry);
+        }
+
+        std::vector<flecs::entity> RegisterSystems(NexusEngine::Engine& engine) override
+        {
+            REF(engine);
+            return {};
+        }
+    };
+}
+
+extern "C" PROJECTGAME_API NexusEngine::IGameApp* LoadGame()
+{
+    return new ProjectGame();
+}
+
+extern "C" PROJECTGAME_API void UnloadGame(NexusEngine::IGameApp* game)
+{
+    delete game;
+}

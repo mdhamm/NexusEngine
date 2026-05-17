@@ -18,43 +18,77 @@
             }
         },
         {
-            "name": "x64-debug",
-            "displayName": "x64 Debug",
+            "name": "editor-x64-debug",
+            "displayName": "Editor x64 Debug",
             "inherits": "windows-base",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
             },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_BUILD_EDITOR": "ON"
             }
         },
         {
-            "name": "x64-release",
-            "displayName": "x64 Release",
-            "inherits": "x64-debug",
+            "name": "editor-x64-release",
+            "displayName": "Editor x64 Release",
+            "inherits": "editor-x64-debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_BUILD_EDITOR": "ON"
             }
         },
         {
-            "name": "x86-debug",
-            "displayName": "x86 Debug",
+            "name": "game-x64-debug",
+            "displayName": "Game x64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_BUILD_EDITOR": "OFF"
+            }
+        },
+        {
+            "name": "game-x64-release",
+            "displayName": "Game x64 Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_BUILD_EDITOR": "OFF"
+            }
+        },
+        {
+            "name": "game-x86-debug",
+            "displayName": "Game x86 Debug",
             "inherits": "windows-base",
             "architecture": {
                 "value": "x86",
                 "strategy": "external"
             },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_BUILD_EDITOR": "OFF"
             }
         },
         {
-            "name": "x86-release",
-            "displayName": "x86 Release",
-            "inherits": "x86-debug",
+            "name": "game-x86-release",
+            "displayName": "Game x86 Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x86",
+                "strategy": "external"
+            },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_BUILD_EDITOR": "OFF"
             }
         },
         {
@@ -74,23 +108,25 @@
             }
         },
         {
-            "name": "web-debug",
-            "displayName": "Web Debug",
+            "name": "game-web-debug",
+            "displayName": "Game Web Debug",
             "inherits": "web-base",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NEXUS_BUILD_EDITOR": "OFF"
             }
         },
         {
-            "name": "web-release",
-            "displayName": "Web Release",
-            "inherits": "web-debug",
+            "name": "game-web-release",
+            "displayName": "Game Web Release",
+            "inherits": "web-base",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "NEXUS_BUILD_EDITOR": "OFF"
             }
         },
         {
-            "name": "linux-debug",
+            "name": "game-linux-debug",
             "displayName": "Linux Debug",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
@@ -110,7 +146,7 @@
             }
         },
         {
-            "name": "macos-debug",
+            "name": "game-macos-debug",
             "displayName": "macOS Debug",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
